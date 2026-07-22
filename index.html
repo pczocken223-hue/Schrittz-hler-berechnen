@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>PULSE // Schrittzähler-Anzeige</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<meta name="theme-color" content="#0b0d0f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PULSE">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0b0d0f; --bg2: #101316; --surface: #14181d; --surface2: #1b2027;
+    --line: rgba(255,255,255,0.08);
+    --emerald: #34d399; --emerald-deep:#16a34a; --teal: #2dd4bf; --amber: #fbbf24; --amber-deep:#d97706;
+    --slate: #94a3b8; --red: #f87171;
+    --text: #edf1f4; --muted: #8a93a0;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color: transparent;}
+  html,body{height:100%;}
+  body{
+    background:
+      radial-gradient(ellipse at 50% -10%, rgba(255,255,255,0.05), transparent 60%),
+      linear-gradient(180deg, var(--bg), var(--bg2));
+    color: var(--text); font-family: 'Manrope', sans-serif;
+    min-height:100vh; overflow-x:hidden; position:relative;
+    -webkit-user-select:none; user-select:none;
+    padding-top: var(--safe-top);
+  }
+  input, textarea{ -webkit-user-select:text; user-select:text; }
+  .wrap{ position:relative; z-index:2; max-width:1180px; margin:0 auto; padding:16px 16px calc(100px + var(--safe-bottom)); }
+
+  header{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px; flex-wrap:wrap; position:sticky; top:0; z-index:20; padding:10px 0; background:linear-gradient(180deg, var(--bg) 60%, transparent); }
+  .logo{ font-weight:800; font-size:1.25rem; letter-spacing:0.5px; color:var(--text); display:flex; align-items:center; gap:8px; }
+  .logo .dot-mark{ width:10px; height:10px; border-radius:50%; background:linear-gradient(135deg, var(--emerald), var(--teal)); flex-shrink:0; }
+  .logo span{ color:var(--muted); font-weight:600; font-size:0.65rem; letter-spacing:1.5px; display:block; margin-top:2px; text-transform:uppercase; }
+  .head-actions{ display:flex; gap:10px; align-items:center; }
+  .install-btn{ display:flex; align-items:center; gap:8px; background: linear-gradient(135deg, var(--emerald), var(--emerald-deep)); color:#062012; border:none; font-weight:700; font-size:0.78rem; padding:10px 14px; border-radius:10px; cursor:pointer; }
+  .install-btn:hover{ filter:brightness(1.08); }
+  .icon-btn{ width:42px; height:42px; border-radius:11px; background: var(--surface); border:1px solid var(--line); color:var(--muted); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1.1rem; transition: all 0.2s ease; }
+  .icon-btn:hover{ border-color:var(--emerald); color:var(--emerald); }
+
+  .hero{
+    background: linear-gradient(160deg, var(--surface2), var(--surface));
+    border:1px solid var(--line); border-radius:18px; padding:22px 24px; margin-bottom:14px;
+    display:flex; align-items:flex-end; justify-content:space-between; gap:18px; flex-wrap:wrap;
+  }
+  .hero-main{ display:flex; align-items:flex-end; gap:24px; flex-wrap:wrap; }
+  .hero-num{ font-weight:800; font-size:clamp(2.1rem, 8vw, 3.4rem); line-height:1; color: var(--emerald); }
+  .hero-num small{ font-size:1.1rem; color:var(--muted); font-weight:600; }
+  .hero-cal{ font-weight:800; font-size:clamp(1.5rem, 5vw, 2.2rem); line-height:1; color: var(--amber); }
+  .hero-cal small{ font-size:0.95rem; color:var(--muted); font-weight:600; }
+  .hero-label{ color:var(--muted); letter-spacing:1.5px; font-size:0.68rem; font-weight:700; text-transform:uppercase; margin-top:6px;}
+  .hero-sub{ text-align:right; color:var(--muted); font-size:0.85rem; }
+  .hero-sub b{ color:var(--text); font-weight:700; }
+
+  .month-panel{ background: var(--surface); border:1px solid var(--line); border-radius:16px; padding:16px 20px; margin-bottom:14px; }
+  .month-top{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px; flex-wrap:wrap; gap:6px; }
+  .month-top h2{ font-size:0.8rem; letter-spacing:1px; text-transform:uppercase; font-weight:700; }
+  .month-top .reset-note{ font-size:0.68rem; color:var(--muted); }
+  .month-nums{ display:flex; justify-content:space-between; font-size:0.8rem; color:var(--muted); margin-bottom:8px; flex-wrap:wrap; gap:6px; }
+  .month-nums b{ color:var(--text); font-weight:700; font-size:0.95rem; }
+  .bar-track{ height:12px; border-radius:8px; background: rgba(255,255,255,0.06); overflow:hidden; border:1px solid var(--line); }
+  .bar-fill{ height:100%; border-radius:8px; background: linear-gradient(90deg, var(--emerald), var(--teal)); transition: width 0.6s ease; }
+  .goal-edit{ background:none; border:none; color:var(--muted); font-size:0.7rem; text-decoration:underline; cursor:pointer; margin-top:8px; }
+
+  .stat-grid{ display:grid; grid-template-columns: repeat(auto-fit, minmax(120px,1fr)); gap:12px; margin-bottom:18px; }
+  .stat-card{ background: var(--surface); border:1px solid var(--line); border-radius:14px; padding:14px 15px; transition: border-color 0.2s ease, transform 0.2s ease; }
+  .stat-card:hover{ border-color: rgba(255,255,255,0.18); transform: translateY(-2px); }
+  .stat-card .val{ font-weight:700; font-size:1.2rem; }
+  .stat-card .lbl{ color:var(--muted); font-size:0.63rem; letter-spacing:0.8px; text-transform:uppercase; margin-top:4px; }
+  .c-teal{ color:var(--teal); } .c-emerald{ color:var(--emerald); } .c-gold{ color:var(--amber); } .c-slate{ color:var(--slate); }
+
+  .panels{ display:grid; grid-template-columns: 1.4fr 1fr; gap:16px; }
+  @media (max-width: 860px){ .panels{ grid-template-columns: 1fr; } }
+
+  .panel{ background: var(--surface); border:1px solid var(--line); border-radius:16px; overflow:hidden; }
+  .panel-head{ padding:14px 18px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; }
+  .panel-head h2{ font-size:0.82rem; letter-spacing:1px; color:var(--text); text-transform:uppercase; font-weight:700; }
+  .panel-head .dot{ width:8px; height:8px; border-radius:50%; background:var(--emerald); animation: pulse 2s infinite; }
+  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:0.35;} }
+
+  #map{ height:360px; width:100%; }
+  .map-legend{ padding:10px 18px; font-size:0.7rem; color:var(--muted); display:flex; gap:14px; flex-wrap:wrap; border-top:1px solid var(--line);}
+  .map-legend span{ display:inline-flex; align-items:center; gap:6px;}
+  .legend-dot{ width:9px; height:9px; border-radius:50%; display:inline-block; }
+  .legend-line{ width:14px; height:2px; display:inline-block; }
+
+  .entries{ max-height:360px; overflow-y:auto; }
+  .entry{ padding:12px 18px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .entry:hover{ background: rgba(255,255,255,0.03); }
+  .entry .e-date{ font-size:0.7rem; color:var(--muted); letter-spacing:0.5px; }
+  .entry .e-km{ font-weight:700; color:var(--emerald); }
+  .entry .e-meta{ font-size:0.68rem; color:var(--muted); }
+  .entry .e-note{ font-size:0.78rem; color:var(--muted); max-width:110px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .del-btn{ background:none; border:1px solid rgba(248,113,113,0.4); color:var(--red); border-radius:6px; width:26px; height:26px; cursor:pointer; font-size:0.9rem; line-height:1; flex-shrink:0; }
+  .del-btn:hover{ background:rgba(248,113,113,0.12); }
+  .empty{ padding:36px 18px; text-align:center; color:var(--muted); font-size:0.88rem; }
+
+  .places-panel{ padding:12px 18px 4px; border-top:1px solid var(--line); }
+  .places-title{ font-size:0.68rem; letter-spacing:1px; text-transform:uppercase; color:var(--muted); font-weight:700; margin-bottom:10px; }
+  .places-title .places-ref{ text-transform:none; letter-spacing:0; }
+  .places-title b{ color:var(--emerald); font-weight:800; }
+  .places-grid{ display:grid; grid-template-columns: repeat(auto-fill, minmax(120px,1fr)); gap:8px; }
+  .place-chip{ display:flex; flex-direction:column; align-items:flex-start; gap:2px; background: rgba(255,255,255,0.04); border:1px solid var(--line); border-radius:10px; padding:8px 10px; cursor:pointer; text-align:left; }
+  .place-chip:hover{ border-color: rgba(255,255,255,0.22); }
+  .place-chip.reached{ border-color: rgba(52,211,153,0.4); background: rgba(52,211,153,0.08); }
+  .place-chip.loading{ opacity:0.5; cursor:default; }
+  .place-chip .pc-dir{ font-size:0.62rem; letter-spacing:1px; color:var(--muted); font-weight:700; }
+  .place-chip.reached .pc-dir{ color:var(--emerald); }
+  .place-chip .pc-name{ font-size:0.82rem; color:var(--text); font-weight:700; }
+  .place-chip .pc-dist{ font-size:0.68rem; color:var(--muted); }
+  .place-chip.reached .pc-dist{ color:var(--emerald); }
+
+  .chart-wrap{ padding:14px 18px 6px; }
+  .chart-toggle{ display:flex; gap:6px; padding:0 18px 10px; }
+  .chart-toggle button{ padding:6px 12px; border-radius:7px; border:1px solid var(--line); background:transparent; color:var(--muted); font-size:0.68rem; font-weight:600; cursor:pointer; text-transform:uppercase; }
+  .chart-toggle button.active{ background: rgba(52,211,153,0.12); border-color: var(--emerald); color:var(--emerald); }
+  #barChart{ width:100%; height:150px; display:block; }
+
+  .overlay{ position:fixed; inset:0; background:rgba(4,5,7,0.72); backdrop-filter: blur(4px); display:none; align-items:center; justify-content:center; z-index:50; padding:20px; }
+  .overlay.show{ display:flex; }
+  .modal{ background: linear-gradient(160deg, var(--surface2), var(--surface)); border:1px solid var(--line); border-radius:18px; padding:24px; width:100%; max-width:420px; max-height:88vh; overflow-y:auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5); animation: modalIn 0.25s ease; }
+  @keyframes modalIn{ from{ opacity:0; transform: translateY(14px) scale(0.97);} to{opacity:1; transform:translateY(0) scale(1);} }
+  .modal h3{ font-size:1rem; letter-spacing:0.5px; margin-bottom:16px; color:var(--text); font-weight:800; }
+  .modal h4{ font-size:0.68rem; letter-spacing:1px; text-transform:uppercase; color:var(--muted); margin: 18px 0 10px; font-weight:700; }
+  .modal h4:first-of-type{ margin-top:2px; }
+  .field{ margin-bottom:14px; }
+  .field label{ display:block; font-size:0.7rem; letter-spacing:0.5px; text-transform:uppercase; color:var(--muted); margin-bottom:6px; }
+  .field input{ width:100%; background: rgba(0,0,0,0.25); border:1px solid var(--line); color:var(--text);
+    padding:11px 12px; border-radius:9px; font-family:'Manrope',sans-serif; font-size:1rem; outline:none; }
+  .field input:focus{ border-color: var(--emerald); box-shadow: 0 0 0 3px rgba(52,211,153,0.15); }
+  .field-row{ display:flex; gap:10px; }
+  .field-row .field{ flex:1; }
+  .stride-suggest{ display:flex; gap:8px; align-items:center; margin-top:6px; }
+  .stride-suggest button{ font-size:0.68rem; padding:7px 10px; border-radius:7px; border:1px solid var(--line); background:rgba(52,211,153,0.1); color:var(--emerald); cursor:pointer; font-weight:700; white-space:nowrap; }
+  .mode-switch{ display:flex; gap:8px; margin-bottom:16px; background:rgba(0,0,0,0.2); padding:4px; border-radius:10px; border:1px solid var(--line); }
+  .mode-switch .ms-btn{ flex:1; padding:9px 8px; border:none; border-radius:7px; background:transparent; color:var(--muted); font-size:0.72rem; font-weight:700; cursor:pointer; text-transform:uppercase; letter-spacing:0.3px; }
+  .mode-switch .ms-btn.active{ background: rgba(52,211,153,0.14); color:var(--emerald); }
+  .step-preview{ margin-top:8px; background: rgba(52,211,153,0.08); border:1px solid rgba(52,211,153,0.25); border-radius:9px; padding:10px 12px; font-size:0.85rem; color:var(--muted); }
+  .step-preview b{ color:var(--emerald); font-weight:700; }
+  .modal-actions{ display:flex; gap:10px; margin-top:18px; }
+  .modal-actions button{ flex:1; padding:12px; border-radius:9px; border:none; font-size:0.8rem; font-weight:700; cursor:pointer; }
+  .btn-cancel{ background: rgba(255,255,255,0.06); color: var(--muted); }
+  .btn-save{ background: linear-gradient(135deg, var(--emerald), var(--emerald-deep)); color:#062012; font-weight:800; }
+  .btn-save:hover{ filter: brightness(1.08); }
+  .hint{ font-size:0.7rem; color:var(--muted); margin-top:4px; line-height:1.5; }
+  .backup-row{ display:flex; gap:10px; }
+  .backup-row button{ flex:1; padding:11px; border-radius:9px; border:1px solid var(--line); background:rgba(255,255,255,0.04); color:var(--text); font-size:0.78rem; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; }
+  .backup-row button:hover{ border-color: var(--emerald); color:var(--emerald); }
+  .divider{ border:none; border-top:1px solid var(--line); margin:16px 0; }
+
+  ::-webkit-scrollbar{ width:8px; }
+  ::-webkit-scrollbar-thumb{ background: var(--surface2); border-radius:4px; }
+  ::-webkit-scrollbar-track{ background:transparent; }
+
+  .toast{ position:fixed; bottom: calc(88px + var(--safe-bottom)); left:50%; transform:translateX(-50%) translateY(20px); opacity:0;
+    background: var(--surface2); border:1px solid var(--emerald); color:var(--text); padding:12px 22px; border-radius:10px;
+    font-size:0.82rem; letter-spacing:0.3px; box-shadow:0 8px 24px rgba(0,0,0,0.4); transition: all 0.35s cubic-bezier(.4,0,.2,1); z-index:60; text-align:center; max-width:90vw;
+    pointer-events:none; }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  .fab{
+    position:fixed; right:18px; bottom: calc(20px + var(--safe-bottom)); z-index:40;
+    font-weight:700; font-size:0.8rem;
+    background: linear-gradient(135deg, var(--emerald), var(--emerald-deep)); color:#062012; border:none; padding:16px 24px; border-radius:30px; cursor:pointer;
+    box-shadow: 0 8px 24px rgba(22,163,74,0.35);
+    display:flex; align-items:center; gap:8px; transition: transform 0.15s ease, box-shadow 0.25s ease;
+  }
+  .fab:hover{ transform: translateY(-2px); box-shadow: 0 10px 28px rgba(22,163,74,0.45); }
+  .fab:active{ transform: scale(0.96); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo"><span class="dot-mark"></span><div>PULSE<span>SCHRITTZÄHLER-ANZEIGE // <span id="homeBaseLabel">TEMPLIN</span> BASE</span></div></div>
+    <div class="head-actions">
+      <button class="install-btn" id="installBtn" onclick="installApp()">⬇ App installieren</button>
+      <button class="icon-btn" onclick="openSettings()" title="Einstellungen">⚙</button>
+    </div>
+  </header>
+
+  <div class="hero">
+    <div>
+      <div class="hero-main">
+        <div>
+          <div class="hero-num" id="heroKm">0<small> km</small></div>
+          <div class="hero-label">Gesamtstrecke seit Start</div>
+        </div>
+        <div>
+          <div class="hero-cal" id="heroCal">0<small> kcal</small></div>
+          <div class="hero-label">Verbrannt (geschätzt)</div>
+        </div>
+        <div>
+          <div class="hero-cal" id="heroKg" style="color:var(--emerald)">0<small> kg</small></div>
+          <div class="hero-label">Abgenommen (geschätzt)</div>
+        </div>
+      </div>
+    </div>
+    <div class="hero-sub">
+      Das sind <b id="heroMeters">0 m</b> insgesamt<br>
+      entspricht ungefähr <span id="heroCompare">–</span><br>
+      <span style="font-size:0.7rem;">kg-Schätzung: ca. 7700 kcal ≈ 1 kg – nur ein grober Richtwert</span>
+    </div>
+  </div>
+
+  <div class="month-panel">
+    <div class="month-top">
+      <h2>Monats-Pfad</h2>
+      <span class="reset-note" id="monthName">–</span>
+    </div>
+    <div class="month-nums">
+      <span><b id="monthKm">0</b> km / <b id="monthM">0</b> m diesen Monat</span>
+      <span>Ziel: <b id="monthGoal">30</b> km</span>
+    </div>
+    <div class="bar-track"><div class="bar-fill" id="monthBar" style="width:0%"></div></div>
+    <button class="goal-edit" onclick="openSettings()">Monatsziel ändern</button>
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-card"><div class="val c-teal" id="statCount">0</div><div class="lbl">Einträge diesen Monat</div></div>
+    <div class="stat-card"><div class="val c-emerald" id="statSteps">0</div><div class="lbl">Schritte diesen Monat</div></div>
+    <div class="stat-card"><div class="val c-gold" id="statCal">0</div><div class="lbl">Kalorien verbrannt (kcal)</div></div>
+    <div class="stat-card"><div class="val c-teal" id="statKmDay">0 km</div><div class="lbl">Ø Kilometer pro Tag</div></div>
+    <div class="stat-card"><div class="val c-emerald" id="statKmMonth">0 km</div><div class="lbl">Kilometer diesen Monat</div></div>
+    <div class="stat-card"><div class="val c-slate" id="statLongest">0 km</div><div class="lbl">Bester Tag (km)</div></div>
+  </div>
+
+  <div class="panels">
+    <div class="panel">
+      <div class="panel-head"><h2 id="mapPanelTitle">Weg ab Templin</h2><span class="dot"></span></div>
+      <div id="map"></div>
+      <div class="map-legend">
+        <span><span class="legend-line" style="background:var(--emerald-deep)"></span> dieser Monat</span>
+        <span><span class="legend-line" style="background:var(--teal); opacity:0.6;"></span> letzter Monat (Archiv)</span>
+        <span><span class="legend-line" style="background:var(--slate); opacity:0.6;"></span> N/O/S/W ab Wohnort</span>
+        <span>Punkt = ein Eintrag</span>
+      </div>
+      <div class="places-panel">
+        <div class="places-title">Orte in Reichweite <span class="places-ref">(bei <b id="placesRef">0</b> km diesen Monat)</span></div>
+        <div class="places-grid" id="placesGrid"></div>
+      </div>
+      <div class="chart-toggle">
+        <button class="ct-btn active" data-range="days" onclick="setChartRange('days')">14 Tage</button>
+        <button class="ct-btn" data-range="months" onclick="setChartRange('months')">12 Monate</button>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="barChart"></canvas>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Log</h2><span class="dot" style="background:var(--amber);"></span></div>
+      <div class="entries" id="entryList"></div>
+    </div>
+  </div>
+</div>
+
+<button class="fab" onclick="openModal()">＋ Schritte eintragen</button>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h3>SCHRITTZÄHLER-STAND EINTRAGEN</h3>
+    <div class="mode-switch">
+      <button type="button" class="ms-btn active" id="modeBtnSingle" onclick="setEntryMode('single')">Einzelner Tag</button>
+      <button type="button" class="ms-btn" id="modeBtnMulti" onclick="setEntryMode('multi')">Zeitraum (Testmodus)</button>
+    </div>
+
+    <div id="singleFields">
+      <div class="field">
+        <label>Schritte (vom Schrittzähler ablesen)</label>
+        <input type="number" id="inputSteps" step="1" min="0" placeholder="z.B. 7284" oninput="updateStepPreview()">
+        <div class="step-preview">≈ <b id="previewKm">0</b> km · <b id="previewM">0</b> m · <b id="previewCal">0</b> kcal</div>
+      </div>
+      <div class="field">
+        <label>Datum</label>
+        <input type="date" id="inputDate">
+      </div>
+      <div class="field">
+        <label>Notiz (optional)</label>
+        <input type="text" id="inputNote" placeholder="z.B. Spaziergang am See">
+      </div>
+    </div>
+
+    <div id="multiFields" style="display:none;">
+      <div class="hint" style="margin-bottom:12px;">Testfunktion: trägt für jeden Tag im Zeitraum einen Eintrag nach. Zum Prüfen von Durchschnitt, Karte & Statistik mit vielen Daten auf einmal.</div>
+      <div class="field-row">
+        <div class="field">
+          <label>Von</label>
+          <input type="date" id="inputMultiFrom">
+        </div>
+        <div class="field">
+          <label>Bis</label>
+          <input type="date" id="inputMultiTo">
+        </div>
+      </div>
+      <div class="field">
+        <label>Schritte pro Tag</label>
+        <input type="number" id="inputMultiSteps" step="1" min="0" placeholder="z.B. 8000" oninput="updateMultiPreview()">
+      </div>
+      <div class="field" style="display:flex; align-items:center; gap:8px; flex-direction:row;">
+        <input type="checkbox" id="inputMultiRandom" style="width:auto;" onchange="updateMultiPreview()">
+        <label style="margin:0;">Zufällig variieren (±15%, realistischer für Tests)</label>
+      </div>
+      <div class="step-preview" id="multiPreview">Zeitraum wählen …</div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Abbrechen</button>
+      <button class="btn-save" onclick="saveEntry()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="settingsOverlay">
+  <div class="modal">
+    <h3>EINSTELLUNGEN</h3>
+
+    <h4>Persönliche Daten</h4>
+    <div class="field">
+      <label>Größe (cm)</label>
+      <input type="number" id="inputHeight" step="1" min="100" placeholder="z.B. 178">
+      <div class="stride-suggest">
+        <span class="hint" style="margin-top:0;">Schlägt eine passende Schrittlänge vor.</span>
+        <button type="button" onclick="applyStrideSuggestion()">→ übernehmen</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>Schrittlänge (cm)</label>
+      <input type="number" id="inputStride" step="1" min="30" placeholder="z.B. 78">
+      <div class="hint">Standard: 78 cm. Bestimmt die Umrechnung Schritte → km.</div>
+    </div>
+    <div class="field">
+      <label>Körpergewicht (kg)</label>
+      <input type="number" id="inputWeight" step="0.1" min="20" placeholder="z.B. 78">
+      <div class="hint">Wird für die Kalorienschätzung (Distanz × Gewicht) verwendet.</div>
+    </div>
+
+    <h4>Ziel</h4>
+    <div class="field">
+      <label>Monatsziel (km)</label>
+      <input type="number" id="inputGoal" step="1" min="1" placeholder="z.B. 30">
+    </div>
+
+    <hr class="divider">
+
+    <h4>Wohnort</h4>
+    <div class="field">
+      <label>Ort / Adresse</label>
+      <input type="text" id="inputHomeSearch" placeholder="z.B. Templin oder Straße, Ort">
+      <div class="stride-suggest">
+        <span class="hint" style="margin-top:0;" id="homeStatus">Aktuell: Templin (Standard)</span>
+        <button type="button" onclick="searchHomeLocation()">🔍 suchen</button>
+      </div>
+      <div class="hint">Wird als Zentrum für den Monats-Pfad und die vier Himmelsrichtungen (N/O/S/W) auf der Karte verwendet.</div>
+    </div>
+
+    <hr class="divider">
+
+    <h4>Jahresverlauf</h4>
+    <div class="hint" id="archiveInfo">Noch keine archivierten Monate.</div>
+    <div class="hint">Am Monatsende werden die Tages-Einträge geleert, die Monats-km bleiben als Archiv erhalten (für den 12-Monats-Vergleich oben). Nach 12 archivierten Monaten wird der Verlauf komplett zurückgesetzt – Einstellungen bleiben erhalten.</div>
+
+    <hr class="divider">
+
+    <h4>Wecker</h4>
+    <div class="backup-row">
+      <button type="button" onclick="openAlarmApp()">⏰ Wecker vorbereiten (18 Uhr, stumm)</button>
+    </div>
+    <div class="hint">Öffnet auf Android direkt die Wecker-App mit 18:00 Uhr und „Kein Ton" vorausgefüllt. „Wiederholen: täglich" bitte einmal antippen, falls es dein Hersteller nicht automatisch übernimmt. Auf dem iPhone geht das leider nicht automatisch – dort bitte in der Uhr-App: Wecker → ＋ → 18:00 → Ton „Kein Ton" → Wiederholen: täglich.</div>
+
+    <hr class="divider">
+
+    <h4>Daten-Backup</h4>
+    <div class="backup-row">
+      <button type="button" onclick="exportData()">💾 Sichern</button>
+      <button type="button" onclick="document.getElementById('importFile').click()">📂 Laden</button>
+    </div>
+    <input type="file" id="importFile" accept="application/json" style="display:none" onchange="importData(event)">
+    <div class="hint">Sichern lädt eine Backup-Datei herunter. Laden stellt Einträge & Einstellungen daraus wieder her.</div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeSettings()">Abbrechen</button>
+      <button class="btn-save" onclick="saveSettings()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="placeOverlay">
+  <div class="modal">
+    <h3 id="placeTitle">Ort</h3>
+    <div class="hint" id="placeMeta" style="font-size:0.8rem; color:var(--text); margin-bottom:10px;"></div>
+    <div class="step-preview" id="placeStatus" style="margin-bottom:12px;"></div>
+    <div class="hint" id="placeInfo" style="font-size:0.82rem; line-height:1.6;"></div>
+    <div class="modal-actions">
+      <button class="btn-save" onclick="closePlaceInfo()">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+  const TEMPLIN = { lat: 53.1169, lon: 13.4980, name: 'Templin' }; // 17268 Templin, exakte Zentrumskoordinaten (Standard-Wohnort)
+  const STORAGE_KEY = 'pulse_entries_v3';
+  const SETTINGS_KEY = 'pulse_settings_v3';
+  const ARCHIVE_KEY = 'pulse_archive_v1';
+  const MONTHS_DE = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+  const KCAL_PER_KG = 7700; // grober Richtwert: ca. 7700 kcal entsprechen 1 kg Körperfett
+
+  let entries = [];
+  let archive = []; // [{month:'YYYY-MM', km, cal, steps, count}], max 12 Einträge, dann kompletter Reset
+  let settings = { strideCm: 78, monthlyGoalKm: 30, weightKg: null, heightCm: null, homeLocation: null, activeMonth: null };
+  let map, pathLayerGroup;
+  let chartRange = 'days';
+
+  function home(){ return settings.homeLocation || TEMPLIN; }
+
+  // ---------- storage (localStorage: works standalone, no external dependency) ----------
+  async function loadData(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      entries = raw ? JSON.parse(raw) : [];
+    }catch(e){ entries = []; }
+    try{
+      const raw2 = localStorage.getItem(SETTINGS_KEY);
+      if(raw2) settings = Object.assign(settings, JSON.parse(raw2));
+    }catch(e){ /* defaults */ }
+    try{
+      const raw3 = localStorage.getItem(ARCHIVE_KEY);
+      archive = raw3 ? JSON.parse(raw3) : [];
+    }catch(e){ archive = []; }
+    rolloverMonths();
+  }
+  async function persistEntries(){
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); }
+    catch(e){ showToast('⚠ Speichern fehlgeschlagen'); }
+  }
+  async function persistSettings(){
+    try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }
+    catch(e){ showToast('⚠ Einstellungen konnten nicht gespeichert werden'); }
+  }
+  async function persistArchive(){
+    try{ localStorage.setItem(ARCHIVE_KEY, JSON.stringify(archive)); }
+    catch(e){ showToast('⚠ Verlauf konnte nicht gespeichert werden'); }
+  }
+
+  // ---------- Monatswechsel: alter Monat wird als km-Summe archiviert, Einträge geleert ----------
+  // Nach 12 archivierten Monaten wird komplett zurückgesetzt (Archiv + Einträge),
+  // als wäre die App neu installiert. Persönliche Einstellungen (Gewicht, Größe,
+  // Schrittlänge, Ziel, Wohnort) bleiben davon unberührt.
+  function parseMonthKey(key){
+    const [y,m] = key.split('-').map(Number);
+    return new Date(y, m-1, 1);
+  }
+  function rolloverMonths(){
+    const now = new Date();
+    const curKey = monthKey(now);
+    if(!settings.activeMonth){ settings.activeMonth = curKey; return; }
+    if(settings.activeMonth === curKey) return;
+    let cursor = parseMonthKey(settings.activeMonth);
+    let changed = false;
+    while(monthKey(cursor) !== curKey){
+      const mKey = monthKey(cursor);
+      const monthEntries = entries.filter(e=> monthKey(new Date(e.date)) === mKey);
+      const km = monthEntries.reduce((s,e)=>s+kmFor(e),0);
+      const cal = monthEntries.reduce((s,e)=>s+caloriesFor(e),0);
+      const steps = monthEntries.reduce((s,e)=>s+e.steps,0);
+      archive.push({ month: mKey, km, cal, steps, count: monthEntries.length });
+      cursor.setMonth(cursor.getMonth()+1);
+      changed = true;
+    }
+    if(changed){
+      entries = [];
+      if(archive.length >= 12){ archive = []; }
+      settings.activeMonth = curKey;
+      persistEntries();
+      persistArchive();
+      persistSettings();
+    }
+  }
+
+  // ---------- backup export / import ----------
+  function exportData(){
+    const payload = { entries, settings, archive, exportedAt: new Date().toISOString() };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type:'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `pulse-backup-${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('✓ Backup heruntergeladen');
+  }
+  function importData(event){
+    const file = event.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = async ()=>{
+      try{
+        const data = JSON.parse(reader.result);
+        if(!Array.isArray(data.entries)) throw new Error('invalid');
+        entries = data.entries;
+        if(data.settings && typeof data.settings === 'object') settings = Object.assign(settings, data.settings);
+        if(Array.isArray(data.archive)) archive = data.archive;
+        await persistEntries();
+        await persistSettings();
+        await persistArchive();
+        renderAll();
+        document.getElementById('inputStride').value = settings.strideCm;
+        document.getElementById('inputGoal').value = settings.monthlyGoalKm;
+        document.getElementById('inputWeight').value = settings.weightKg || '';
+        document.getElementById('inputHeight').value = settings.heightCm || '';
+        showToast('✓ Backup wiederhergestellt');
+      }catch(e){
+        showToast('⚠ Datei ungültig – kein PULSE-Backup');
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+  }
+
+  // ---------- helpers ----------
+  function kmFor(entry){ return entry.steps * (settings.strideCm/100) / 1000; }
+  function caloriesFor(entry){
+    const km = kmFor(entry);
+    const w = settings.weightKg || 75; // Schätzung mit Standardgewicht, falls nicht angegeben
+    return km * w * 0.9; // Richtwert für zügiges Gehen
+  }
+  function destinationPoint(lat, lon, distanceKm, bearingDeg){
+    const R = 6371;
+    const brng = bearingDeg * Math.PI/180;
+    const lat1 = lat * Math.PI/180, lon1 = lon * Math.PI/180;
+    const lat2 = Math.asin(Math.sin(lat1)*Math.cos(distanceKm/R) + Math.cos(lat1)*Math.sin(distanceKm/R)*Math.cos(brng));
+    const lon2 = lon1 + Math.atan2(Math.sin(brng)*Math.sin(distanceKm/R)*Math.cos(lat1), Math.cos(distanceKm/R)-Math.sin(lat1)*Math.sin(lat2));
+    return { lat: lat2*180/Math.PI, lon: lon2*180/Math.PI };
+  }
+  function seededBearing(seedStr){
+    let h = 0;
+    for(let i=0;i<seedStr.length;i++){ h = (h*31 + seedStr.charCodeAt(i)) >>> 0; }
+    return (h % 360);
+  }
+  function haversineKm(lat1,lon1,lat2,lon2){
+    const R = 6371, toRad = d=>d*Math.PI/180;
+    const dLat = toRad(lat2-lat1), dLon = toRad(lon2-lon1);
+    const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+    return 2*R*Math.asin(Math.sqrt(a));
+  }
+  function bearingBetween(lat1,lon1,lat2,lon2){
+    const toRad = d=>d*Math.PI/180;
+    const y = Math.sin(toRad(lon2-lon1))*Math.cos(toRad(lat2));
+    const x = Math.cos(toRad(lat1))*Math.sin(toRad(lat2)) - Math.sin(toRad(lat1))*Math.cos(toRad(lat2))*Math.cos(toRad(lon2-lon1));
+    return (Math.atan2(y,x)*180/Math.PI + 360) % 360;
+  }
+
+  // ---------- "Orte in Reichweite": exact endpoint in all 4 cardinal directions ----------
+  // For each direction we project the exact beeline (Luftlinie) endpoint at the CURRENT
+  // MONTH's total distance, then reverse-geocode that exact coordinate (via OpenStreetMap
+  // Nominatim) to find out what is really there — accurate at any distance, and it resets
+  // automatically every month because refKm only ever comes from this month's entries.
+  const COMPASS4 = [ {dir:'N', label:'Norden', bearing:0}, {dir:'O', label:'Osten', bearing:90}, {dir:'S', label:'Süden', bearing:180}, {dir:'W', label:'Westen', bearing:270} ];
+  const geocodeCache = {};
+  async function reverseGeocode(lat, lon){
+    const key = lat.toFixed(3)+','+lon.toFixed(3);
+    if(geocodeCache[key]) return geocodeCache[key];
+    try{
+      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=10&addressdetails=1&accept-language=de`;
+      const res = await fetch(url, { headers:{ 'Accept':'application/json' } });
+      if(!res.ok) throw new Error('geocode failed');
+      const data = await res.json();
+      const a = data.address || {};
+      const name = a.city || a.town || a.municipality || a.village || a.hamlet || a.county
+        || a.state || a.country || (data.display_name ? data.display_name.split(',')[0] : 'Unbekannter Ort');
+      const region = [a.state, a.country].filter(Boolean).join(', ');
+      const result = { name, region, display: data.display_name || '' };
+      geocodeCache[key] = result;
+      return result;
+    }catch(e){
+      return { name:'Ort nicht ermittelbar', region:'', display:'Keine Internetverbindung oder Kartendienst nicht erreichbar.' };
+    }
+  }
+  async function reachablePlaces(refKm){
+    const results = [];
+    for(const c of COMPASS4){
+      const h = home();
+      const endpoint = destinationPoint(h.lat, h.lon, refKm, c.bearing);
+      const place = await reverseGeocode(endpoint.lat, endpoint.lon);
+      results.push({ dir:c.dir, label:c.label, endpoint, place, refKm });
+      await new Promise(r=> setTimeout(r, 250)); // fair use towards Nominatim
+    }
+    return results;
+  }
+  renderPlaces._token = 0;
+  async function renderPlaces(){
+    const grid = document.getElementById('placesGrid');
+    if(!grid) return;
+    const now = new Date();
+    const curKey = monthKey(now);
+    const sorted = [...entries].sort((a,b)=> a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+    const curEntries = sorted.filter(e=> monthKey(new Date(e.date)) === curKey);
+    const curPts = buildPath(curEntries, curKey);
+    const refKm = curPts.length ? curPts[curPts.length-1].cumKm : 0;
+    document.getElementById('placesRef').textContent = fmt(refKm,2);
+    if(refKm <= 0){
+      grid.innerHTML = '<div class="empty" style="padding:16px;">Noch keine Einträge diesen Monat.</div>';
+      return;
+    }
+    grid.innerHTML = COMPASS4.map(c=>`
+      <div class="place-chip loading"><span class="pc-dir">${c.label}</span><span class="pc-name">wird berechnet …</span></div>
+    `).join('');
+    const myToken = ++renderPlaces._token;
+    const list = await reachablePlaces(refKm);
+    if(myToken !== renderPlaces._token) return; // a newer entry was added meanwhile — discard stale result
+    grid.innerHTML = list.map((p,i)=>`
+      <button class="place-chip" onclick="showPlaceInfo(${i})">
+        <span class="pc-dir">${p.label}</span>
+        <span class="pc-name">${p.place.name}</span>
+        <span class="pc-dist">${fmt(p.refKm,1)} km Luftlinie</span>
+      </button>
+    `).join('');
+    renderPlaces._list = list;
+  }
+  function showPlaceInfo(i){
+    const p = renderPlaces._list[i];
+    if(!p) return;
+    document.getElementById('placeTitle').textContent = p.place.name;
+    document.getElementById('placeMeta').textContent = `Richtung ${p.label} · ${fmt(p.refKm,2)} km Luftlinie ab ${home().name} (diesen Monat)`;
+    document.getElementById('placeStatus').textContent = p.place.region ? `Liegt in: ${p.place.region}` : '';
+    document.getElementById('placeInfo').textContent = p.place.display || '';
+    document.getElementById('placeOverlay').classList.add('show');
+  }
+  function closePlaceInfo(){ document.getElementById('placeOverlay').classList.remove('show'); }
+  function fmt(n, d=1){ return Number(n).toFixed(d).replace('.', ','); }
+  function monthKey(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+  function showToast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(()=> t.classList.remove('show'), 2800);
+  }
+
+  // ---------- modal: entry ----------
+  let entryMode = 'single';
+  function setEntryMode(mode){
+    entryMode = mode;
+    document.getElementById('modeBtnSingle').classList.toggle('active', mode==='single');
+    document.getElementById('modeBtnMulti').classList.toggle('active', mode==='multi');
+    document.getElementById('singleFields').style.display = mode==='single' ? '' : 'none';
+    document.getElementById('multiFields').style.display = mode==='multi' ? '' : 'none';
+  }
+  function openModal(){
+    setEntryMode('single');
+    document.getElementById('inputDate').value = new Date().toISOString().slice(0,10);
+    document.getElementById('inputSteps').value = '';
+    document.getElementById('inputNote').value = '';
+    const today = new Date().toISOString().slice(0,10);
+    document.getElementById('inputMultiFrom').value = today;
+    document.getElementById('inputMultiTo').value = today;
+    document.getElementById('inputMultiSteps').value = '';
+    document.getElementById('inputMultiRandom').checked = false;
+    updateStepPreview();
+    updateMultiPreview();
+    document.getElementById('overlay').classList.add('show');
+  }
+  function closeModal(){ document.getElementById('overlay').classList.remove('show'); }
+  function updateStepPreview(){
+    const steps = Number(document.getElementById('inputSteps').value) || 0;
+    const km = steps * (settings.strideCm/100) / 1000;
+    const cal = km * (settings.weightKg || 75) * 0.9;
+    document.getElementById('previewKm').textContent = fmt(km,2);
+    document.getElementById('previewM').textContent = Math.round(km*1000).toLocaleString('de-DE');
+    document.getElementById('previewCal').textContent = Math.round(cal).toLocaleString('de-DE');
+  }
+  function multiDayCount(){
+    const from = document.getElementById('inputMultiFrom').value;
+    const to = document.getElementById('inputMultiTo').value;
+    if(!from || !to) return 0;
+    const d1 = new Date(from), d2 = new Date(to);
+    const days = Math.round((d2-d1)/86400000) + 1;
+    return days>0 ? days : 0;
+  }
+  function updateMultiPreview(){
+    const el = document.getElementById('multiPreview');
+    const days = multiDayCount();
+    const steps = Number(document.getElementById('inputMultiSteps').value) || 0;
+    if(days<=0 || steps<=0){ el.textContent = 'Zeitraum & Schritte pro Tag eingeben …'; return; }
+    const km = steps * (settings.strideCm/100) / 1000;
+    el.innerHTML = `Erstellt <b>${days}</b> Einträge · je ≈ <b>${fmt(km,2)}</b> km · gesamt ≈ <b>${fmt(km*days,2)}</b> km`;
+  }
+
+  async function saveEntry(){
+    if(entryMode === 'single'){
+      const date = document.getElementById('inputDate').value || new Date().toISOString().slice(0,10);
+      const note = document.getElementById('inputNote').value.trim();
+      const steps = Number(document.getElementById('inputSteps').value);
+      if(!steps || steps<=0){ showToast('Bitte gültige Schrittzahl eingeben'); return; }
+      entries.push({ id: Date.now()+'-'+Math.random().toString(36).slice(2,7), date, steps, note });
+      entries.sort((a,b)=> a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+      await persistEntries();
+      closeModal();
+      renderAll();
+      const km = kmFor(entries[entries.length-1]);
+      showToast(`✓ ${steps.toLocaleString('de-DE')} Schritte = ${fmt(km,2)} km`);
+    } else {
+      const from = document.getElementById('inputMultiFrom').value;
+      const to = document.getElementById('inputMultiTo').value;
+      const baseSteps = Number(document.getElementById('inputMultiSteps').value);
+      const randomize = document.getElementById('inputMultiRandom').checked;
+      const days = multiDayCount();
+      if(!from || !to || days<=0){ showToast('Bitte gültigen Zeitraum wählen'); return; }
+      if(!baseSteps || baseSteps<=0){ showToast('Bitte gültige Schrittzahl pro Tag eingeben'); return; }
+      const d = new Date(from);
+      for(let i=0;i<days;i++){
+        const dateStr = d.toISOString().slice(0,10);
+        let steps = baseSteps;
+        if(randomize){
+          const factor = 0.85 + Math.random()*0.30; // ±15%
+          steps = Math.round(baseSteps * factor);
+        }
+        entries.push({ id: Date.now()+'-'+i+'-'+Math.random().toString(36).slice(2,7), date: dateStr, steps, note:'Testmodus' });
+        d.setDate(d.getDate()+1);
+      }
+      entries.sort((a,b)=> a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+      await persistEntries();
+      closeModal();
+      renderAll();
+      showToast(`✓ ${days} Testeinträge angelegt`);
+    }
+  }
+  async function deleteEntry(id){
+    entries = entries.filter(e=> e.id !== id);
+    await persistEntries();
+    renderAll();
+  }
+
+  // ---------- modal: settings ----------
+  function openSettings(){
+    document.getElementById('inputStride').value = settings.strideCm;
+    document.getElementById('inputGoal').value = settings.monthlyGoalKm;
+    document.getElementById('inputWeight').value = settings.weightKg || '';
+    document.getElementById('inputHeight').value = settings.heightCm || '';
+    document.getElementById('inputHomeSearch').value = '';
+    const h = home();
+    document.getElementById('homeStatus').textContent = 'Aktuell: ' + h.name + (settings.homeLocation ? '' : ' (Standard)');
+    renderArchiveInfo();
+    document.getElementById('settingsOverlay').classList.add('show');
+  }
+  function closeSettings(){ document.getElementById('settingsOverlay').classList.remove('show'); }
+  function renderArchiveInfo(){
+    const el = document.getElementById('archiveInfo');
+    if(!el) return;
+    if(archive.length===0){ el.textContent = 'Noch keine archivierten Monate. (0 von 12)'; return; }
+    const rows = [...archive].reverse().map(a=>{
+      const [y,m] = a.month.split('-');
+      return `${MONTHS_DE[Number(m)-1]} ${y}: ${fmt(a.km,2)} km`;
+    }).join(' · ');
+    el.innerHTML = `<b style="color:var(--text)">${archive.length} von 12 Monaten archiviert:</b><br>${rows}`;
+  }
+  async function searchHomeLocation(){
+    const q = document.getElementById('inputHomeSearch').value.trim();
+    if(!q){ showToast('Bitte Ort oder Adresse eingeben'); return; }
+    document.getElementById('homeStatus').textContent = 'Suche …';
+    try{
+      const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(q)}&limit=1&accept-language=de`;
+      const res = await fetch(url, { headers:{ 'Accept':'application/json' } });
+      if(!res.ok) throw new Error('search failed');
+      const data = await res.json();
+      if(!data.length){ document.getElementById('homeStatus').textContent = 'Nicht gefunden – bitte anders formulieren.'; return; }
+      const r = data[0];
+      const name = r.display_name.split(',')[0];
+      settings._pendingHome = { lat: Number(r.lat), lon: Number(r.lon), name };
+      document.getElementById('homeStatus').textContent = 'Gefunden: ' + name + ' — wird beim Speichern übernommen.';
+      showToast('✓ Ort gefunden: ' + name);
+    }catch(e){
+      document.getElementById('homeStatus').textContent = 'Suche fehlgeschlagen (keine Verbindung?).';
+    }
+  }
+  function applyStrideSuggestion(){
+    const h = Number(document.getElementById('inputHeight').value);
+    if(!h || h<=0){ showToast('Bitte zuerst Größe eingeben'); return; }
+    const suggested = Math.round(h * 0.415);
+    document.getElementById('inputStride').value = suggested;
+    showToast(`Vorschlag: ${suggested} cm Schrittlänge`);
+  }
+  async function saveSettings(){
+    const s = Number(document.getElementById('inputStride').value);
+    const g = Number(document.getElementById('inputGoal').value);
+    const w = Number(document.getElementById('inputWeight').value);
+    const h = Number(document.getElementById('inputHeight').value);
+    if(s>0) settings.strideCm = s;
+    if(g>0) settings.monthlyGoalKm = g;
+    settings.weightKg = w>0 ? w : null;
+    settings.heightCm = h>0 ? h : null;
+    if(settings._pendingHome){
+      settings.homeLocation = settings._pendingHome;
+      delete settings._pendingHome;
+    }
+    await persistSettings();
+    closeSettings();
+    renderAll();
+    showToast('✓ Einstellungen gespeichert');
+  }
+
+  // ---------- open native alarm app, prefilled ----------
+  function openAlarmApp(){
+    const isAndroid = /Android/.test(navigator.userAgent);
+    if(!isAndroid){
+      showToast('Auf iPhone nicht automatisch möglich: Uhr-App → Wecker → ＋ → 18:00 → Ton „Kein Ton" → Wiederholen: täglich');
+      return;
+    }
+    // NOTE: no host segment after "intent:" (i.e. no "//alarm/") — adding one sets an
+    // Intent data-URI, and the alarm app's SET_ALARM filter has no <data> tag, so the
+    // whole intent silently fails to resolve. Keeping it as "intent:#Intent;...;end" fixes it.
+    const intentUrl = 'intent:#Intent;action=android.intent.action.SET_ALARM;'
+      + 'i.android.intent.extra.alarm.HOUR=18;'
+      + 'i.android.intent.extra.alarm.MINUTES=0;'
+      + 'S.android.intent.extra.alarm.MESSAGE=' + encodeURIComponent('PULSE: Schritte eintragen') + ';'
+      + 'S.android.intent.extra.alarm.RINGTONE=silent;'
+      + 'B.android.intent.extra.alarm.VIBRATE=false;'
+      + 'B.android.intent.extra.alarm.SKIP_UI=false;'
+      + 'il.android.intent.extra.alarm.DAYS=1,2,3,4,5,6,7;'
+      + 'S.browser_fallback_url=' + encodeURIComponent('https://play.google.com/store/search?q=wecker&c=apps') + ';'
+      + 'end';
+    let stillHere = true;
+    const onHide = ()=>{ stillHere = false; };
+    document.addEventListener('visibilitychange', onHide, { once:true });
+    window.location.href = intentUrl;
+    setTimeout(()=>{
+      document.removeEventListener('visibilitychange', onHide);
+      if(stillHere){
+        showToast('Konnte Wecker-App nicht automatisch öffnen. Bitte manuell: Wecker → ＋ → 18:00 → stumm → täglich');
+      }
+    }, 1200);
+  }
+
+  // ---------- map ----------
+  function initMap(){
+    const h = home();
+    map = L.map('map', { zoomControl:true, attributionControl:true }).setView([h.lat, h.lon], 10);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap &copy; CARTO', subdomains: 'abcd', maxZoom: 19
+    }).addTo(map);
+    const startIcon = L.divIcon({
+      className:'', html:'<div style="width:16px;height:16px;border-radius:50%;background:#16a34a;box-shadow:0 0 0 3px #fff, 0 2px 8px rgba(0,0,0,0.3);"></div>',
+      iconSize:[16,16], iconAnchor:[8,8]
+    });
+    L.marker([h.lat, h.lon], {icon:startIcon}).addTo(map).bindPopup('<b>'+h.name+'</b><br>Startpunkt (Monatsanfang)');
+    pathLayerGroup = L.layerGroup().addTo(map);
+    updateHomeLabels();
+  }
+  function updateHomeLabels(){
+    const h = home();
+    const lbl = document.getElementById('homeBaseLabel'); if(lbl) lbl.textContent = h.name.toUpperCase();
+    const panelLbl = document.getElementById('mapPanelTitle'); if(panelLbl) panelLbl.textContent = 'Weg ab ' + h.name;
+  }
+
+  // builds a path for a given month's entries: ONE fixed bearing per month,
+  // every point computed straight from Templin at the cumulative distance —
+  // guarantees the whole trace lies on one exact straight line, never zigzags.
+  function buildPath(monthEntries, seedKey){
+    const h = home();
+    const bearing = seededBearing(seedKey || 'x');
+    const pts = [{ lat: h.lat, lon: h.lon, cumKm: 0 }];
+    let cum = 0;
+    monthEntries.forEach(e=>{
+      cum += kmFor(e);
+      const next = destinationPoint(h.lat, h.lon, cum, bearing);
+      pts.push({ lat: next.lat, lon: next.lon, cumKm: cum, entry: e });
+    });
+    return pts;
+  }
+
+  function renderMap(){
+    pathLayerGroup.clearLayers();
+    updateHomeLabels();
+    const h = home();
+    const now = new Date();
+    const curKey = monthKey(now);
+    const prevDate = new Date(now.getFullYear(), now.getMonth()-1, 1);
+    const prevKey = monthKey(prevDate);
+
+    const curEntries = [...entries].sort((a,b)=> a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+
+    // vorheriger Monat: Tages-Einträge werden monatlich geleert, daher nur noch die
+    // archivierte km-Summe verfügbar — als schlichte gestrichelte Referenzlinie (kein Verlauf mehr im Detail).
+    const prevArch = archive.find(a=> a.month === prevKey);
+    if(prevArch && prevArch.km > 0){
+      const prevEnd = destinationPoint(h.lat, h.lon, prevArch.km, seededBearing(prevKey));
+      L.polyline([[h.lat,h.lon],[prevEnd.lat,prevEnd.lon]], { color:'#2dd4bf', weight:2.5, opacity:0.5, dashArray:'3,7' }).addTo(pathLayerGroup)
+        .bindPopup(`<b>Letzter Monat</b><br>${fmt(prevArch.km,2)} km gesamt (archiviert)`);
+    }
+
+    // current month: bright continuing path
+    const curPts = buildPath(curEntries, curKey);
+    if(curPts.length > 1){
+      for(let i=1;i<curPts.length;i++){
+        const t = i / (curPts.length-1);
+        const color = mixColor('#16a34a', '#d97706', t);
+        L.polyline([[curPts[i-1].lat,curPts[i-1].lon],[curPts[i].lat,curPts[i].lon]], { color, weight:4, opacity:0.9 }).addTo(pathLayerGroup);
+      }
+      curPts.slice(1).forEach((p, idx)=>{
+        const t = (idx+1) / (curPts.length-1);
+        const color = mixColor('#16a34a', '#d97706', t);
+        const e = p.entry;
+        L.circleMarker([p.lat,p.lon], { radius:6, color:'#fff', weight:2, fillColor:color, fillOpacity:0.95 }).addTo(pathLayerGroup)
+          .bindPopup(`<b>${e.date}</b><br>${e.steps.toLocaleString('de-DE')} Schritte = ${fmt(kmFor(e),2)} km<br>Gesamt Monat: ${fmt(p.cumKm,2)} km${e.note? '<br>'+e.note:''}`);
+      });
+    }
+
+    // vier Himmelsrichtungen: dünne Linien vom Wohnort aus, Länge = diesen Monat gelaufene km
+    const refKm = curPts.length ? curPts[curPts.length-1].cumKm : 0;
+    if(refKm > 0){
+      COMPASS4.forEach(c=>{
+        const end = destinationPoint(h.lat, h.lon, refKm, c.bearing);
+        L.polyline([[h.lat,h.lon],[end.lat,end.lon]], { color:'#8a93a0', weight:1.5, opacity:0.55, dashArray:'2,6' }).addTo(pathLayerGroup);
+        L.marker([end.lat,end.lon], { icon: L.divIcon({ className:'', html:`<div style="font-size:10px;font-weight:800;color:#94a3b8;background:rgba(11,13,15,0.7);padding:2px 5px;border-radius:5px;white-space:nowrap;">${c.dir}</div>`, iconSize:[20,16], iconAnchor:[10,8] }) }).addTo(pathLayerGroup);
+      });
+    }
+
+    const allPts = [];
+    curPts.forEach(p=> allPts.push([p.lat,p.lon]));
+    if(refKm > 0){ COMPASS4.forEach(c=> allPts.push([destinationPoint(h.lat,h.lon,refKm,c.bearing).lat, destinationPoint(h.lat,h.lon,refKm,c.bearing).lon])); }
+    if(allPts.length > 1) map.fitBounds(allPts, {padding:[30,30], maxZoom:12});
+    else map.setView([h.lat, h.lon], 10);
+  }
+  function mixColor(c1, c2, t){
+    const a = hexToRgb(c1), b = hexToRgb(c2);
+    const r = Math.round(a[0] + (b[0]-a[0])*t);
+    const g = Math.round(a[1] + (b[1]-a[1])*t);
+    const bl = Math.round(a[2] + (b[2]-a[2])*t);
+    return `rgb(${r},${g},${bl})`;
+  }
+  function hexToRgb(hex){
+    hex = hex.replace('#','');
+    return [parseInt(hex.substring(0,2),16), parseInt(hex.substring(2,4),16), parseInt(hex.substring(4,6),16)];
+  }
+
+  // ---------- chart ----------
+  function setChartRange(range){
+    chartRange = range;
+    document.querySelectorAll('.ct-btn').forEach(b=> b.classList.toggle('active', b.dataset.range===range));
+    renderChart();
+  }
+  function renderChart(){
+    const canvas = document.getElementById('barChart');
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const cssW = canvas.clientWidth || canvas.parentElement.clientWidth;
+    canvas.width = cssW * dpr; canvas.height = 150 * dpr;
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0,0,cssW,150);
+
+    let buckets = [];
+    if(chartRange === 'days'){
+      const days = 14;
+      const today = new Date(); today.setHours(0,0,0,0);
+      for(let i=days-1;i>=0;i--){
+        const d = new Date(today); d.setDate(d.getDate()-i);
+        const key = d.toISOString().slice(0,10);
+        const km = entries.filter(e=>e.date===key).reduce((s,e)=>s+kmFor(e),0);
+        buckets.push({km, label: d.getDate()+'.'+(d.getMonth()+1)});
+      }
+    } else {
+      // Tages-Einträge werden monatlich geleert; für den Jahresvergleich (welcher Monat
+      // war am besten?) nutzen wir die archivierten Monats-Summen + den laufenden Monat.
+      const months = 12;
+      const today = new Date();
+      const curKey = monthKey(today);
+      const archMap = {}; archive.forEach(a=> archMap[a.month] = a.km);
+      for(let i=months-1;i>=0;i--){
+        const d = new Date(today.getFullYear(), today.getMonth()-i, 1);
+        const key = monthKey(d);
+        const km = key===curKey ? entries.reduce((s,e)=>s+kmFor(e),0) : (archMap[key] || 0);
+        buckets.push({km, label: MONTHS_DE[d.getMonth()].slice(0,3)});
+      }
+    }
+    const max = Math.max(1, ...buckets.map(b=>b.km));
+    const n = buckets.length;
+    const w = cssW / n;
+    const gradient = ctx.createLinearGradient(0,0,0,150);
+    gradient.addColorStop(0,'#34d399'); gradient.addColorStop(1,'#d97706');
+    buckets.forEach((b,i)=>{
+      const h = (b.km/max) * 105;
+      const x = i*w + w*0.2;
+      const barW = w*0.6;
+      ctx.fillStyle = b.km>0 ? gradient : 'rgba(255,255,255,0.07)';
+      const y = 120 - h;
+      roundRect(ctx, x, y, barW, h, 3);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(138,147,160,0.9)';
+      ctx.font = '10px Manrope'; ctx.textAlign='center';
+      ctx.fillText(b.label, x+barW/2, 138);
+    });
+  }
+  function roundRect(ctx,x,y,w,h,r){
+    if(h<=0) h=0.001;
+    ctx.beginPath();
+    ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+  }
+
+  // ---------- stats & list ----------
+  function isCurrentMonth(dateStr){
+    const d = new Date(dateStr), now = new Date();
+    return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth();
+  }
+  function lifetimeTotals(){
+    const archKm = archive.reduce((s,a)=>s+a.km,0);
+    const archCal = archive.reduce((s,a)=>s+a.cal,0);
+    const curKm = entries.reduce((s,e)=>s+kmFor(e),0);
+    const curCal = entries.reduce((s,e)=>s+caloriesFor(e),0);
+    return { km: archKm+curKm, cal: archCal+curCal };
+  }
+  function renderStats(){
+    const { km: totalKm, cal: totalCal } = lifetimeTotals();
+    // Einträge werden am Monatsende geleert, daher enthält "entries" immer nur den laufenden Monat.
+    const monthEntries = entries.filter(e=> isCurrentMonth(e.date));
+    const monthKm = monthEntries.reduce((s,e)=>s+kmFor(e),0);
+    const monthCal = monthEntries.reduce((s,e)=>s+caloriesFor(e),0);
+    const monthSteps = monthEntries.reduce((s,e)=>s+e.steps,0);
+    const bestDay = monthEntries.reduce((m,e)=>Math.max(m,kmFor(e)),0);
+    const now = new Date();
+    const daysElapsed = now.getDate();
+    const kmPerDay = monthKm / daysElapsed;
+
+    document.getElementById('heroKm').innerHTML = fmt(totalKm,2)+'<small> km</small>';
+    document.getElementById('heroCal').innerHTML = Math.round(totalCal).toLocaleString('de-DE')+'<small> kcal</small>';
+    document.getElementById('heroKg').innerHTML = fmt(totalCal / KCAL_PER_KG, 2)+'<small> kg</small>';
+    document.getElementById('heroMeters').textContent = Math.round(totalKm*1000).toLocaleString('de-DE')+' m';
+    document.getElementById('heroCompare').textContent = totalKm >= 1 ? compareDistance(totalKm) : 'einer kurzen Runde um den Block';
+
+    document.getElementById('statCount').textContent = monthEntries.length;
+    document.getElementById('statSteps').textContent = monthSteps.toLocaleString('de-DE');
+    document.getElementById('statCal').textContent = Math.round(monthCal).toLocaleString('de-DE');
+    document.getElementById('statKmDay').textContent = fmt(kmPerDay,2)+' km';
+    document.getElementById('statKmMonth').textContent = fmt(monthKm,2)+' km';
+    document.getElementById('statLongest').textContent = fmt(bestDay,2)+' km';
+
+    document.getElementById('monthName').textContent = MONTHS_DE[now.getMonth()]+' '+now.getFullYear()+' · Pfad setzt sich automatisch zurück';
+    document.getElementById('monthKm').textContent = fmt(monthKm,2);
+    document.getElementById('monthM').textContent = Math.round(monthKm*1000).toLocaleString('de-DE');
+    document.getElementById('monthGoal').textContent = fmt(settings.monthlyGoalKm,0);
+    const pct = Math.min(100, (monthKm / settings.monthlyGoalKm) * 100);
+    document.getElementById('monthBar').style.width = pct+'%';
+  }
+  function compareDistance(km){
+    const refs = [
+      {d:5.2, t:'einem Spaziergang quer durch eine Kleinstadt'},
+      {d:16, t:'einer knappen Halbmarathon-Distanz'},
+      {d:21.1, t:'einem Halbmarathon'},
+      {d:42.2, t:'einem Marathon'},
+      {d:80, t:'einer längeren Tagestour mit dem Rad'},
+      {d:350, t:'der Strecke Berlin – Hamburg'},
+      {d:600, t:'der Strecke Berlin – München'}
+    ];
+    let best = refs[0];
+    for(const r of refs){ if(km >= r.d*0.6) best = r; }
+    return 'etwa ' + best.t;
+  }
+  function renderList(){
+    const list = document.getElementById('entryList');
+    if(entries.length===0){
+      list.innerHTML = '<div class="empty">Noch keine Einträge.<br>Tipp auf „＋ Schritte eintragen".</div>';
+      return;
+    }
+    const sorted = [...entries].sort((a,b)=> b.date.localeCompare(a.date));
+    list.innerHTML = sorted.map(e=>`
+      <div class="entry">
+        <div>
+          <div class="e-date">${e.date}</div>
+          <div class="e-km">${fmt(kmFor(e),2)} km</div>
+          <div class="e-meta">${e.steps.toLocaleString('de-DE')} Schritte · ${Math.round(caloriesFor(e)).toLocaleString('de-DE')} kcal</div>
+        </div>
+        <div class="e-note">${e.note ? e.note : ''}</div>
+        <button class="del-btn" onclick="deleteEntry('${e.id}')">×</button>
+      </div>
+    `).join('');
+  }
+
+  function renderAll(){
+    renderStats();
+    renderList();
+    renderMap();
+    renderPlaces();
+    renderChart();
+  }
+  window.addEventListener('resize', renderChart);
+
+  // ---------- PWA install ----------
+  let deferredPrompt;
+  function isStandalone(){
+    return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  }
+  window.addEventListener('beforeinstallprompt', (e)=>{
+    e.preventDefault();
+    deferredPrompt = e;
+  });
+  async function installApp(){
+    if(isStandalone()){ showToast('App ist bereits installiert ✓'); return; }
+    if(deferredPrompt){
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      return;
+    }
+    const ua = navigator.userAgent;
+    const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+    if(isIOS){
+      showToast('Safari: Teilen-Symbol ⬆ antippen → „Zum Home-Bildschirm"');
+    } else {
+      showToast('Browser-Menü öffnen → „App installieren" bzw. „Zum Startbildschirm hinzufügen"');
+    }
+  }
+  if(isStandalone()){
+    document.getElementById('installBtn').style.display = 'none';
+  }
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', ()=>{ navigator.serviceWorker.register('./sw.js').catch(()=>{}); });
+  }
+
+  (async function init(){
+    initMap();
+    await loadData();
+    renderAll();
+    // Prüft alle 60s, ob inzwischen Mitternacht/Monatswechsel passiert ist (App im Hintergrund offen)
+    setInterval(()=>{
+      const before = settings.activeMonth;
+      rolloverMonths();
+      if(settings.activeMonth !== before){ renderAll(); showToast('↻ Neuer Monat gestartet – Monats-Pfad zurückgesetzt'); }
+    }, 60000);
+    document.addEventListener('visibilitychange', ()=>{
+      if(document.visibilityState==='visible'){
+        const before = settings.activeMonth;
+        rolloverMonths();
+        if(settings.activeMonth !== before) renderAll();
+      }
+    });
+  })();
+</script>
+</body>
+</html>
