@@ -1,1 +1,1 @@
-# Schrittz-hler-berechnen
+# Schrittzähler Berechner
