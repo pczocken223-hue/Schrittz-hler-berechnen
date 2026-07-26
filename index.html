@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Unser Universum</title>
+<meta name="theme-color" content="#05020c">
+<style>
+  :root{
+    --cyan:#22d3ee; --purple:#a855f7; --magenta:#ec4899; --text:#e9e4f7; --text-dim:#9a8fc2;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none;}
+  html,body{ height:100%; margin:0; overflow:hidden; background:#03010a; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; color:var(--text); }
+
+  #nebula{ position:fixed; inset:-20%; z-index:0;
+    background:
+      radial-gradient(circle at 20% 30%, rgba(168,85,247,0.16), transparent 45%),
+      radial-gradient(circle at 80% 70%, rgba(34,211,238,0.14), transparent 45%),
+      radial-gradient(circle at 55% 85%, rgba(236,72,153,0.12), transparent 40%),
+      #03010a;
+    animation:nebulaDrift 60s linear infinite;
+    filter:hue-rotate(0deg) saturate(1) brightness(1);
+    will-change:filter;
+  }
+  @keyframes nebulaDrift{ 0%{ transform:rotate(0deg) scale(1); } 100%{ transform:rotate(360deg) scale(1); } }
+
+  /* Farb-Flash im Takt der Musik – legt sich additiv ueber den Nebel */
+  #colorFlash{ position:fixed; inset:-20%; z-index:0; pointer-events:none; mix-blend-mode:screen; will-change:background; }
+
+  #starCanvas{ position:fixed; inset:0; z-index:1; display:block; }
+
+  /* Startbildschirm */
+  #startScreen{ position:fixed; inset:0; z-index:50; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:22px; text-align:center; padding:0 30px; background:rgba(3,1,10,0.35); backdrop-filter:blur(2px);
+    transition:opacity .9s ease; }
+  #startScreen.hidden{ opacity:0; pointer-events:none; }
+  #startScreen h1{ font-size:26px; margin:0; font-weight:300; letter-spacing:0.08em;
+    background:linear-gradient(90deg,var(--cyan),var(--purple),var(--magenta)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  #startScreen p{ margin:0; color:var(--text-dim); font-size:13px; max-width:280px; line-height:1.6; }
+  #startBtn{ margin-top:8px; padding:16px 44px; border-radius:999px; border:1px solid rgba(255,255,255,0.25);
+    background:rgba(255,255,255,0.06); color:#fff; font-size:15px; letter-spacing:0.1em; font-family:inherit;
+    backdrop-filter:blur(6px); box-shadow:0 0 30px rgba(168,85,247,0.25); }
+  #startBtn:active{ transform:scale(0.96); }
+
+  /* Treibende Erinnerungsfotos */
+  .memory-photo{ position:fixed; z-index:5; border-radius:10px; padding:8px 8px 26px; background:#f5f2ec;
+    box-shadow:0 10px 40px rgba(0,0,0,0.55); opacity:0; pointer-events:none; }
+  .memory-photo img{ display:block; width:100%; height:100%; object-fit:cover; border-radius:4px; }
+
+  /* Kleine Herzchen, die beim Erscheinen eines Fotos aufsteigen */
+  .memory-heart{ position:fixed; z-index:6; pointer-events:none; opacity:0; line-height:1;
+    text-shadow:0 0 10px rgba(236,72,153,0.6); will-change:transform,opacity; }
+
+  /* Steuerung */
+  #controls{ position:fixed; left:0; right:0; bottom:0; z-index:40; display:flex; justify-content:center; gap:12px;
+    padding:14px 16px calc(14px + env(safe-area-inset-bottom)); opacity:0; transition:opacity .6s ease; pointer-events:none; }
+  #controls.show{ opacity:1; pointer-events:auto; }
+  .ctrl-btn{ width:50px; height:50px; border-radius:50%; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.16);
+    backdrop-filter:blur(8px); color:#fff; font-size:19px; display:flex; align-items:center; justify-content:center;
+    box-shadow:0 0 10px rgba(168,85,247,0.25); will-change:box-shadow; transition:box-shadow .08s linear; }
+  .ctrl-btn:active{ transform:scale(0.92); }
+  .ctrl-btn.active{ border-color:var(--cyan); box-shadow:0 0 16px rgba(34,211,238,0.4); }
+
+  #hint{ position:fixed; top:calc(16px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%); z-index:40;
+    font-size:11px; color:var(--text-dim); background:rgba(255,255,255,0.05); padding:6px 14px; border-radius:999px;
+    opacity:0; transition:opacity .6s ease .3s; pointer-events:none; text-align:center; max-width:80%; }
+  #hint.show{ opacity:1; }
+
+  .toast{ position:fixed; top:16px; left:50%; transform:translateX(-50%); z-index:200;
+    background:linear-gradient(135deg,#7c3aed,var(--magenta)); color:#fff; padding:10px 18px; border-radius:999px;
+    font-size:13px; font-weight:600; box-shadow:0 6px 24px rgba(236,72,153,0.4); opacity:0; pointer-events:none;
+    transition:opacity .3s; }
+  .toast.show{ opacity:1; }
+</style>
+</head>
+<body>
+
+<div id="nebula"></div>
+<div id="colorFlash"></div>
+<canvas id="starCanvas"></canvas>
+
+<div id="hint">Ab und zu zieht eine Erinnerung vorbei</div>
+
+<div id="startScreen">
+  <h1>UNSER UNIVERSUM</h1>
+  <p>Lehn dich zurück. Du musst nichts tun – du fliegst einfach langsam hindurch, und ab und zu zieht eine Erinnerung vorbei.</p>
+  <button id="startBtn">✦ Starten ✦</button>
+</div>
+
+<div id="controls">
+  <button class="ctrl-btn" id="playPauseBtn" title="Musik pausieren" style="display:none;">⏸️</button>
+</div>
+
+<div class="toast" id="toast"></div>
+<audio id="bgMusic" loop></audio>
+
+<script>
+(function(){
+"use strict";
+
+/* ================= KONFIGURATION =================
+   So bleibt für dich nur EIN Handgriff übrig: Fotos umbenennen
+   und in den Ordner "bilder/" im GitHub-Repo hochladen. Der Rest
+   (Pfade eintragen usw.) passiert automatisch.
+
+   SO GEHT'S:
+   1) Lege im Repo einen Ordner "bilder" an (falls noch nicht vorhanden).
+   2) Benenne deine Fotos der Reihe nach um:
+        bild-01.jpg, bild-02.jpg, bild-03.jpg, ...
+      (führende Null bei 1-9, danach ganz normal weiterzählen)
+   3) Trage unten bei PHOTO_COUNT ein, wie viele Fotos es sind.
+   4) Falls deine Fotos KEINE .jpg sind (z.B. .png), trage das bei
+      PHOTO_EXT ein.
+   Fertig – die Liste der Pfade wird automatisch daraus gebaut.
+
+   MUSIC_FILES bleibt wie gehabt: relative Pfade zu deinen Musikdateien
+   (z.B. Ordner "musik/"), die im Repo liegen.
+=====================================================*/
+const PHOTO_FOLDER="bilder/";   // Ordnername im Repo
+const PHOTO_COUNT=12;           // <-- Anzahl deiner Fotos hier eintragen
+const PHOTO_EXT="jpg";          // <-- Dateiendung: jpg, jpeg oder png
+
+const PHOTO_FILES=Array.from({length:PHOTO_COUNT}, (_, i) =>
+  `${PHOTO_FOLDER}bild-${String(i+1).padStart(2,"0")}.${PHOTO_EXT}`
+);
+
+const MUSIC_FILES=[
+
+];
+
+const toastEl=document.getElementById("toast");
+function showToast(t){ toastEl.textContent=t; toastEl.classList.add("show"); setTimeout(()=>toastEl.classList.remove("show"), 2200); }
+
+// ---------- Bewegliche Hintergrundfarbe im Musikrhythmus ----------
+const nebulaEl=document.getElementById("nebula");
+const flashEl=document.getElementById("colorFlash");
+const controlsEl=document.getElementById("controls");
+let hueRotation=0;               // dreht sich staendig langsam weiter -> Hintergrund "wandert" farblich
+let flashHue=0, flashAlpha=0, lastColorBeatTs=0;
+const COLOR_BEAT_COOLDOWN_MS=240;                 // Mindestabstand zwischen zwei Farb-Blitzen
+const BEAT_HUES=[0, 340, 285, 195, 15];            // rot, magenta, lila, cyan, orange-rot -> "ab und zu mal rot"
+function updateBackgroundColor(audio, now){
+  // Grunddrehung: immer in Bewegung, wird bei mehr Pegel etwas schneller
+  hueRotation=(hueRotation + 0.045 + audio.overall*0.22) % 360;
+  const sat=1 + audio.bass*0.9;
+  const bri=1 + audio.bass*0.22;
+  nebulaEl.style.filter=`hue-rotate(${hueRotation.toFixed(1)}deg) saturate(${sat.toFixed(2)}) brightness(${bri.toFixed(2)})`;
+
+  // Kraeftiger Farbblitz im Takt (nur bei echtem Bass-Ausschlag, mit Abklingzeit)
+  const isColorBeat = audio.bass>0.38 && (now-lastColorBeatTs)>COLOR_BEAT_COOLDOWN_MS;
+  if (isColorBeat){
+    lastColorBeatTs=now;
+    flashHue=BEAT_HUES[Math.floor(Math.random()*BEAT_HUES.length)];
+    flashAlpha=Math.min(0.6, 0.28 + audio.bass*0.45);
+  }
+  flashAlpha*=0.90; // schnelles, weiches Abklingen bis zum naechsten Beat
+  flashEl.style.background=
+    `radial-gradient(circle at 50% 42%, hsla(${flashHue},85%,55%,${flashAlpha.toFixed(3)}) 0%, hsla(${flashHue},85%,45%,0) 65%)`;
+
+  // Steuerung pulsiert im selben Takt mit
+  const glowSize=(10+audio.bass*30).toFixed(0);
+  const glowAlpha=Math.min(0.75, 0.22 + flashAlpha*0.7 + audio.bass*0.35).toFixed(2);
+  controlsEl.style.filter=`drop-shadow(0 0 ${glowSize}px hsla(${flashHue},85%,55%,${glowAlpha}))`;
+}
+
+// ---------- Sternenfeld (Warp-Flug) ----------
+const canvas=document.getElementById("starCanvas");
+const ctx=canvas.getContext("2d");
+let W=0, H=0, cx=0, cy=0;
+function resize(){ W=canvas.width=window.innerWidth; H=canvas.height=window.innerHeight; cx=W/2; cy=H/2; }
+resize(); window.addEventListener("resize", resize);
+
+const STAR_COUNT=160;
+const STAR_COLORS=["255,255,255","190,225,255","220,190,255","255,210,240"];
+let stars=[];
+function makeStar(){
+  return {
+    x:(Math.random()*2-1), y:(Math.random()*2-1), // -1..1 normalized
+    z:Math.random()*1+0.1,
+    c:STAR_COLORS[Math.floor(Math.random()*STAR_COLORS.length)],
+    tf:1.2+Math.random()*2.6, tp:Math.random()*Math.PI*2,
+    flareAt: 3+Math.random()*20, flareDur:0.4+Math.random()*0.35 // ab und zu extra funkeln
+  };
+}
+for (let i=0;i<STAR_COUNT;i++) stars.push(makeStar());
+
+let flying=false, baseSpeed=0.0022, speed=0.0022, targetSpeed=0.0022;
+let zoom=1, targetZoom=1;
+let slowCount=0; // >0 während ein Erinnerungsfoto zu sehen ist
+let bassAvg=0, lastPhotoSpawnTs=0;
+const PHOTO_MIN_GAP_MS=3800;   // frühestens wieder ein Foto, auch wenn die Musik pumpt
+const PHOTO_MAX_GAP_MS=11000;  // spätestens wieder ein Foto, auch ohne Musik/ruhige Stelle
+function detectBeatAndSpawnPhoto(bass){
+  bassAvg += (bass-bassAvg)*0.04;
+  const now=performance.now();
+  if (!flying || !photos.length) return;
+  const gap=now-lastPhotoSpawnTs;
+  const isBeat = bass>0.32 && bass>bassAvg*1.3;
+  if ((isBeat && gap>PHOTO_MIN_GAP_MS) || gap>PHOTO_MAX_GAP_MS){
+    lastPhotoSpawnTs=now;
+    spawnMemoryPhoto();
+    if (isBeat) targetZoom=Math.min(1.4, targetZoom+0.16); // kleiner Zoom-Kick im Takt
+  }
+}
+
+function stepStars(){
+  ctx.fillStyle="rgba(3,1,10,0.35)";
+  ctx.fillRect(0,0,W,H);
+  const audio=getAudioLevel();
+  updateBackgroundColor(audio, performance.now());
+  targetSpeed = slowCount>0 ? baseSpeed*0.22 : baseSpeed*(1+audio.bass*3.4);
+  speed += (targetSpeed-speed)*0.045;
+  targetZoom += (1-targetZoom)*0.02; // Zoom entspannt sich automatisch wieder auf 1
+  zoom += (targetZoom-zoom)*0.08;
+  detectBeatAndSpawnPhoto(audio.bass);
+  const scaleBase=Math.min(W,H)*0.46*zoom;
+  const twinkleBoost=1+audio.overall*2.4;
+  for (let s of stars){
+    s.z -= speed;
+    if (s.z<=0.02){ Object.assign(s, makeStar()); s.z=1; }
+    const k=1/s.z;
+    const sx=cx + s.x*k*scaleBase;
+    const sy=cy + s.y*k*scaleBase;
+    if (sx<-20||sx>W+20||sy<-20||sy>H+20) continue;
+    const twinkle=0.65+0.35*Math.sin(nowSec*s.tf + s.tp);
+    let flareBoost=0;
+    if (nowSec>=s.flareAt && nowSec<=s.flareAt+s.flareDur){
+      const ft=(nowSec-s.flareAt)/s.flareDur;
+      flareBoost=Math.sin(ft*Math.PI);
+    } else if (nowSec>s.flareAt+s.flareDur){
+      s.flareAt=nowSec+6+Math.random()*22; s.flareDur=0.4+Math.random()*0.35;
+    }
+    const size=Math.max(0.4, (1-s.z)*3.2*twinkle*(0.8+twinkleBoost*0.3) + flareBoost*3.4);
+    const alpha=Math.min(1, (1-s.z)*1.4*twinkle*(0.75+twinkleBoost*0.35) + flareBoost*0.55);
+    ctx.beginPath();
+    ctx.fillStyle=`rgba(${s.c},${alpha})`;
+    ctx.arc(sx, sy, size, 0, Math.PI*2);
+    ctx.fill();
+    if (audio.bass>0.55){
+      ctx.beginPath();
+      ctx.fillStyle=`rgba(${s.c},${alpha*0.18})`;
+      ctx.arc(sx, sy, size*2.4, 0, Math.PI*2);
+      ctx.fill();
+    }
+    if (flareBoost>0.45){
+      const rayLen=size*3.2*flareBoost;
+      ctx.strokeStyle=`rgba(${s.c},${flareBoost*0.7})`;
+      ctx.lineWidth=0.8;
+      ctx.beginPath();
+      ctx.moveTo(sx-rayLen, sy); ctx.lineTo(sx+rayLen, sy);
+      ctx.moveTo(sx, sy-rayLen); ctx.lineTo(sx, sy+rayLen);
+      ctx.stroke();
+    }
+  }
+  nowSec=performance.now()/1000;
+  requestAnimationFrame(stepStars);
+}
+let nowSec=0;
+requestAnimationFrame(stepStars);
+
+// leichtes Zoomen per Pinch/Wheel (optional – nicht nötig, aber möglich)
+let pinchDist=null;
+window.addEventListener("touchmove",(e)=>{
+  if (e.touches.length===2){
+    const dx=e.touches[0].clientX-e.touches[1].clientX, dy=e.touches[0].clientY-e.touches[1].clientY;
+    const d=Math.hypot(dx,dy);
+    if (pinchDist!=null){ targetZoom=Math.min(2.4, Math.max(0.5, targetZoom*(d/pinchDist))); }
+    pinchDist=d;
+  }
+},{passive:true});
+window.addEventListener("touchend",()=>{ pinchDist=null; });
+window.addEventListener("wheel",(e)=>{
+  targetZoom=Math.min(2.4, Math.max(0.5, targetZoom - e.deltaY*0.0006));
+},{passive:true});
+
+// ---------- Start ----------
+document.getElementById("startBtn").onclick=()=>{
+  flying=true;
+  document.getElementById("startScreen").classList.add("hidden");
+  document.getElementById("controls").classList.add("show");
+  document.getElementById("hint").classList.add("show");
+  setTimeout(()=>document.getElementById("hint").classList.remove("show"), 6000);
+  lastPhotoSpawnTs=performance.now()-(PHOTO_MAX_GAP_MS-5000); // erstes Foto nach ca. 5s
+  startPlaylist();
+};
+
+// ---------- Fotos (direkt aus dem GitHub-Repo geladen, wie die Musik) ----------
+let photos=[];
+
+async function loadPhotosFromFiles(){
+  for (const path of PHOTO_FILES){
+    const color=await getDominantColor(path);
+    photos.push({src:path, color});
+  }
+}
+
+function getDominantColor(dataUrl){
+  return new Promise((resolve)=>{
+    const img=new Image();
+    img.crossOrigin="anonymous";
+    img.onload=()=>{
+      const c=document.createElement("canvas"); c.width=20; c.height=20;
+      const cx2=c.getContext("2d"); cx2.drawImage(img,0,0,20,20);
+      let r=0,g=0,b=0,n=0;
+      try{
+        const data=cx2.getImageData(0,0,20,20).data;
+        for (let i=0;i<data.length;i+=4){ r+=data[i]; g+=data[i+1]; b+=data[i+2]; n++; }
+      }catch(e){ resolve("168,85,247"); return; }
+      resolve(Math.round(r/n)+","+Math.round(g/n)+","+Math.round(b/n));
+    };
+    img.onerror=()=>resolve("168,85,247");
+    img.src=dataUrl;
+  });
+}
+
+loadPhotosFromFiles();
+
+const PHOTO_SIDE_MARGIN=12;   // 10-15px Rand links/rechts
+const PHOTO_TOPBOTTOM_MARGIN=40; // ca. 40px Rand oben/unten
+function spawnMemoryPhoto(){
+  if (!photos.length) return;
+  const p=photos[Math.floor(Math.random()*photos.length)];
+  const width=Math.max(120, W-PHOTO_SIDE_MARGIN*2);
+  const height=Math.max(160, H-PHOTO_TOPBOTTOM_MARGIN*2);
+  const el=document.createElement("div");
+  el.className="memory-photo";
+  el.style.width=width+"px"; el.style.height=height+"px";
+  el.style.left=PHOTO_SIDE_MARGIN+"px"; el.style.top=PHOTO_TOPBOTTOM_MARGIN+"px";
+  el.style.background=`linear-gradient(150deg, rgba(${p.color},0.95), rgba(${p.color},0.55))`;
+  el.style.transform="scale(0.6)";
+  el.innerHTML='<img src="'+p.src+'" alt="Erinnerung" crossorigin="anonymous">';
+  document.body.appendChild(el);
+
+  const centerX=PHOTO_SIDE_MARGIN+width/2, centerY=PHOTO_TOPBOTTOM_MARGIN+height/2;
+  const heartTimers=[];
+  for (let i=0;i<5;i++){
+    heartTimers.push(setTimeout(()=>spawnHeart(centerX, centerY), 900+i*(2200/5)+Math.random()*300));
+  }
+
+  slowCount++;
+  const holdMs=3200, fadeInMs=1100, fadeOutMs=1300;
+  const totalMs=fadeInMs+holdMs+fadeOutMs;
+  let start=null, released=false;
+  function anim(ts){
+    if (!start) start=ts;
+    const elapsed=ts-start;
+    const glow=6+getAudioLevel().bass*26;
+    el.style.boxShadow=`0 10px 46px rgba(${p.color},0.55), 0 0 ${glow}px rgba(${p.color},0.5)`;
+    if (elapsed<fadeInMs){
+      const t=elapsed/fadeInMs;
+      el.style.opacity=t;
+      el.style.transform="scale("+(0.6+0.4*easeOutBack(t))+")";
+    } else if (elapsed<fadeInMs+holdMs){
+      el.style.opacity=1;
+      const t=(elapsed-fadeInMs)/holdMs;
+      el.style.transform="scale(1) translateY("+(Math.sin(t*Math.PI*2)*4)+"px)";
+    } else if (elapsed<totalMs){
+      if (!released){ released=true; slowCount=Math.max(0, slowCount-1); }
+      const t=(elapsed-fadeInMs-holdMs)/fadeOutMs;
+      el.style.opacity=1-t;
+      el.style.transform="scale("+(1+t*0.18)+")";
+    } else {
+      if (!released){ released=true; slowCount=Math.max(0, slowCount-1); }
+      heartTimers.forEach(clearTimeout);
+      el.remove();
+      return;
+    }
+    requestAnimationFrame(anim);
+  }
+  requestAnimationFrame(anim);
+}
+function easeOutBack(t){ const c1=1.70158, c3=c1+1; return 1+c3*Math.pow(t-1,3)+c1*Math.pow(t-1,2); }
+
+function spawnHeart(cx0, cy0){
+  const HEARTS=["💜","💗","💖","💙"];
+  const heart=document.createElement("div");
+  heart.className="memory-heart";
+  heart.textContent=HEARTS[Math.floor(Math.random()*HEARTS.length)];
+  const startX=cx0+(Math.random()*80-40), startY=cy0+(Math.random()*60-30);
+  const fontSize=13+Math.random()*11;
+  heart.style.left=startX+"px"; heart.style.top=startY+"px"; heart.style.fontSize=fontSize+"px";
+  document.body.appendChild(heart);
+  const dur=2000+Math.random()*900, drift=(Math.random()*50-25);
+  let start=null;
+  function anim(ts){
+    if (!start) start=ts;
+    const t=(ts-start)/dur;
+    if (t>=1){ heart.remove(); return; }
+    heart.style.transform=`translate(${drift*t}px, ${-95*t}px) scale(${0.7+0.5*Math.sin(t*Math.PI)})`;
+    heart.style.opacity = t<0.15 ? t/0.15 : (t>0.75 ? (1-t)/0.25 : 1);
+    requestAnimationFrame(anim);
+  }
+  requestAnimationFrame(anim);
+}
+
+// ---------- Musik & Audio-Analyse ----------
+const bgMusic=document.getElementById("bgMusic");
+let audioCtx=null, analyser=null, freqData=null, sourceNode=null;
+function ensureAudioGraph(){
+  if (audioCtx) return;
+  try{
+    audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    analyser=audioCtx.createAnalyser();
+    analyser.fftSize=256;
+    analyser.smoothingTimeConstant=0.82;
+    freqData=new Uint8Array(analyser.frequencyBinCount);
+    sourceNode=audioCtx.createMediaElementSource(bgMusic);
+    sourceNode.connect(analyser);
+    analyser.connect(audioCtx.destination);
+  }catch(e){ /* Browser ohne Web-Audio-Unterstützung: einfach ohne Reaktion weiterspielen */ }
+}
+function getAudioLevel(){
+  if (!analyser || bgMusic.paused) return {bass:0, overall:0};
+  analyser.getByteFrequencyData(freqData);
+  const bassCount=Math.max(1, Math.floor(freqData.length*0.15));
+  let bassSum=0; for (let i=0;i<bassCount;i++) bassSum+=freqData[i];
+  let allSum=0; for (let i=0;i<freqData.length;i++) allSum+=freqData[i];
+  return { bass:(bassSum/bassCount)/255, overall:(allSum/freqData.length)/255 };
+}
+let playlist=[]; let playlistIndex=0;
+function shuffle(arr){ const a=arr.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function playPlaylistTrack(i){
+  if (!playlist.length) return;
+  playlistIndex=((i%playlist.length)+playlist.length)%playlist.length;
+  bgMusic.src=playlist[playlistIndex];
+  bgMusic.volume=0.55;
+  ensureAudioGraph();
+  if (audioCtx && audioCtx.state==="suspended") audioCtx.resume();
+  bgMusic.play().then(()=>{
+    document.getElementById("playPauseBtn").style.display="flex";
+    document.getElementById("playPauseBtn").textContent="⏸️";
+  }).catch(()=>showToast("Musik konnte nicht automatisch starten – tippe ⏸️/▶️."));
+}
+bgMusic.addEventListener("ended", ()=>{ if (playlist.length) playPlaylistTrack(playlistIndex+1); });
+function startPlaylist(){
+  if (!MUSIC_FILES.length) return;
+  playlist=shuffle(MUSIC_FILES);
+  playPlaylistTrack(0);
+}
+
+document.getElementById("playPauseBtn").onclick=()=>{
+  if (audioCtx && audioCtx.state==="suspended") audioCtx.resume();
+  if (bgMusic.paused){ bgMusic.play(); document.getElementById("playPauseBtn").textContent="⏸️"; }
+  else { bgMusic.pause(); document.getElementById("playPauseBtn").textContent="▶️"; }
+};
+
+})();
+</script>
+</body>
+</html>
