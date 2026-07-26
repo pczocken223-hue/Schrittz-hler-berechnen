@@ -79,6 +79,9 @@
     font-size:13px; font-weight:600; box-shadow:0 6px 24px rgba(236,72,153,0.4); opacity:0; pointer-events:none;
     transition:opacity .3s; }
   .toast.show{ opacity:1; }
+
+  .beat-ring{ position:fixed; top:50%; left:50%; z-index:4; pointer-events:none;
+    border:2px solid rgba(255,255,255,0.5); border-radius:50%; transform:translate(-50%,-50%); }
 </style>
 </head>
 <body>
@@ -126,6 +129,114 @@ const MUSIC_FILES=[
 const toastEl=document.getElementById("toast");
 function showToast(t){ toastEl.textContent=t; toastEl.classList.add("show"); setTimeout(()=>toastEl.classList.remove("show"), 2200); }
 
+// ---------- Song-Vorab-Analyse ----------
+// Statt nur live auf die Musik zu reagieren, wird der komplette Track einmal
+// durchgescannt (Web Audio decodeAudioData) und eine Liste von Beat-Zeitpunkten
+// (in Sekunden) berechnet. Beim Abspielen tauchen die Fotos dann exakt zu
+// diesen Zeitpunkten auf -> wirklich synchron zum Lied statt nur "live geraten".
+const analysisSchedules={};   // url -> Array von Sekunden-Zeitpunkten (oder null bei Fehler)
+let currentSchedule=null, scheduleIdx=0;
+
+function mixDownToMono(buffer){
+  const ch0=buffer.getChannelData(0);
+  if (buffer.numberOfChannels<2) return ch0;
+  const ch1=buffer.getChannelData(1);
+  const out=new Float32Array(ch0.length);
+  for (let i=0;i<ch0.length;i++) out[i]=(ch0[i]+ch1[i])*0.5;
+  return out;
+}
+
+function extractBeatTimes(buffer){
+  const sr=buffer.sampleRate;
+  const data=mixDownToMono(buffer);
+  // Grobe Bass-Betonung per Tiefpass (einfache exponentielle Glättung)
+  const lp=new Float32Array(data.length);
+  let prev=0;
+  for (let i=0;i<data.length;i++){ prev += 0.02*(data[i]-prev); lp[i]=prev; }
+  // Energie-Hüllkurve in kleinen Fenstern
+  const hopSec=0.02, winSec=0.04;
+  const hop=Math.max(1, Math.floor(sr*hopSec)), win=Math.max(1, Math.floor(sr*winSec));
+  const frames=[];
+  for (let i=0;i+win<lp.length;i+=hop){
+    let sum=0;
+    for (let j=0;j<win;j++){ const v=lp[i+j]; sum+=v*v; }
+    frames.push(Math.sqrt(sum/win));
+  }
+  // Adaptives Peak-Picking: Ausschlag deutlich über dem gleitenden Mittel
+  const beatTimes=[];
+  let avg=frames[0]||0, lastBeatFrame=-9999;
+  const minFrameGap=Math.round(0.24/hopSec);
+  for (let i=0;i<frames.length;i++){
+    avg += (frames[i]-avg)*0.05;
+    if (frames[i]>avg*1.35 && frames[i]>0.015 && (i-lastBeatFrame)>minFrameGap){
+      beatTimes.push(i*hop/sr);
+      lastBeatFrame=i;
+    }
+  }
+  return beatTimes;
+}
+
+// Baut aus den erkannten Beats einen Fahrplan für Fotowechsel: nutzt Beats,
+// wo sie im erlaubten Mindestabstand liegen, und füllt größere Lücken (z.B.
+// ruhige Strophen) automatisch mit dem Maximalabstand auf.
+function buildPhotoSchedule(beatTimes, duration){
+  const minGap=PHOTO_MIN_GAP_MS/1000, maxGap=PHOTO_MAX_GAP_MS/1000;
+  const picked=[]; let last=-Infinity;
+  for (const t of (beatTimes||[])){
+    if (t-last>=minGap){ picked.push(t); last=t; }
+  }
+  const filled=[]; let prevT=0;
+  for (const t of picked){
+    while (t-prevT>maxGap){ prevT+=maxGap; filled.push(prevT); }
+    filled.push(t); prevT=t;
+  }
+  while (duration && duration-prevT>maxGap){ prevT+=maxGap; filled.push(prevT); }
+  return filled;
+}
+
+async function analyzeAllTracks(){
+  ensureAudioGraph();
+  if (!audioCtx) return; // kein Web-Audio verfügbar -> bleibt bei Live-Erkennung
+  for (const url of MUSIC_FILES){
+    if (url in analysisSchedules) continue;
+    try{
+      const resp=await fetch(url);
+      const arrBuf=await resp.arrayBuffer();
+      const audioBuffer=await audioCtx.decodeAudioData(arrBuf);
+      analysisSchedules[url]=buildPhotoSchedule(extractBeatTimes(audioBuffer), audioBuffer.duration);
+    }catch(e){
+      console.warn("Musikanalyse fehlgeschlagen für "+url+" – nutze Live-Erkennung.", e);
+      analysisSchedules[url]=null;
+    }
+  }
+}
+
+// ---------- Beat-Burst: Ring-Effekt + kleiner Kamera-Kick ----------
+let shakeX=0, shakeY=0;
+function spawnBeatRing(hue){
+  const ring=document.createElement("div");
+  ring.className="beat-ring";
+  const size=Math.min(W,H)*0.15;
+  ring.style.width=size+"px"; ring.style.height=size+"px";
+  ring.style.borderColor=`hsla(${hue},85%,65%,0.55)`;
+  document.body.appendChild(ring);
+  let start=null; const dur=750;
+  function anim(ts){
+    if (!start) start=ts;
+    const t=(ts-start)/dur;
+    if (t>=1){ ring.remove(); return; }
+    ring.style.transform=`translate(-50%,-50%) scale(${(1+t*3.2).toFixed(2)})`;
+    ring.style.opacity=(1-t).toFixed(2);
+    requestAnimationFrame(anim);
+  }
+  requestAnimationFrame(anim);
+}
+function triggerBeatBurst(hue){
+  const kick=6+Math.random()*5, angle=Math.random()*Math.PI*2;
+  shakeX=Math.cos(angle)*kick; shakeY=Math.sin(angle)*kick;
+  spawnBeatRing(hue);
+}
+
 // ---------- Bewegliche Hintergrundfarbe im Musikrhythmus ----------
 const nebulaEl=document.getElementById("nebula");
 const flashEl=document.getElementById("colorFlash");
@@ -147,6 +258,7 @@ function updateBackgroundColor(audio, now){
     lastColorBeatTs=now;
     flashHue=BEAT_HUES[Math.floor(Math.random()*BEAT_HUES.length)];
     flashAlpha=Math.min(0.6, 0.28 + audio.bass*0.45);
+    triggerBeatBurst(flashHue);
   }
   flashAlpha*=0.90; // schnelles, weiches Abklingen bis zum naechsten Beat
   flashEl.style.background=
@@ -206,6 +318,19 @@ function detectBeatAndSpawnPhoto(bass){
   }
 }
 
+// Fotos exakt an den vorab berechneten Stellen im Song auslösen. Wird pro
+// Frame mit der aktuellen Abspielposition abgeglichen.
+function scheduledPhotoCheck(){
+  if (!flying || !photos.length || !currentSchedule) return;
+  const t=bgMusic.currentTime;
+  while (scheduleIdx<currentSchedule.length && t>=currentSchedule[scheduleIdx]){
+    spawnMemoryPhoto();
+    targetZoom=Math.min(1.4, targetZoom+0.16);
+    scheduleIdx++;
+    lastPhotoSpawnTs=performance.now();
+  }
+}
+
 function stepStars(){
   ctx.fillStyle="rgba(3,1,10,0.35)";
   ctx.fillRect(0,0,W,H);
@@ -215,7 +340,9 @@ function stepStars(){
   speed += (targetSpeed-speed)*0.045;
   targetZoom += (1-targetZoom)*0.02; // Zoom entspannt sich automatisch wieder auf 1
   zoom += (targetZoom-zoom)*0.08;
-  detectBeatAndSpawnPhoto(audio.bass);
+  if (currentSchedule) scheduledPhotoCheck(); else detectBeatAndSpawnPhoto(audio.bass);
+  shakeX*=0.82; shakeY*=0.82;
+  canvas.style.transform=(Math.abs(shakeX)>0.05||Math.abs(shakeY)>0.05) ? `translate(${shakeX.toFixed(1)}px, ${shakeY.toFixed(1)}px)` : "";
   const scaleBase=Math.min(W,H)*0.46*zoom;
   const twinkleBoost=1+audio.overall*2.4;
   for (let s of stars){
@@ -277,7 +404,15 @@ window.addEventListener("wheel",(e)=>{
 },{passive:true});
 
 // ---------- Start ----------
-document.getElementById("startBtn").onclick=()=>{
+document.getElementById("startBtn").onclick=async ()=>{
+  const btn=document.getElementById("startBtn");
+  btn.disabled=true;
+  const originalLabel=btn.textContent;
+  btn.textContent="✦ Analysiere Musik …";
+  await analyzeAllTracks();
+  btn.textContent=originalLabel;
+  btn.disabled=false;
+
   flying=true;
   document.getElementById("startScreen").classList.add("hidden");
   document.getElementById("controls").classList.add("show");
@@ -336,9 +471,68 @@ folderInput.addEventListener("change", async (e)=>{
 
 const PHOTO_SIDE_MARGIN=12;   // 10-15px Rand links/rechts
 const PHOTO_TOPBOTTOM_MARGIN=40; // ca. 40px Rand oben/unten
+
+// Verschiedene Effekte fürs Auf- und Zuklappen der Fotos – wird bei jedem
+// Foto zufällig gewählt (nie zweimal derselbe hintereinander).
+const PHOTO_EFFECTS=["pop","slideLeft","slideRight","dropBounce","flipX","flipY","spiral","blurZoom"];
+let lastEffect=null;
+function pickEffect(){
+  let e;
+  do{ e=PHOTO_EFFECTS[Math.floor(Math.random()*PHOTO_EFFECTS.length)]; } while (e===lastEffect);
+  lastEffect=e;
+  return e;
+}
+function easeOutBack(t){ const c1=1.70158, c3=c1+1; return 1+c3*Math.pow(t-1,3)+c1*Math.pow(t-1,2); }
+function easeOutCubic(t){ return 1-Math.pow(1-t,3); }
+function easeOutBounce(t){
+  const n1=7.5625, d1=2.75;
+  if (t<1/d1) return n1*t*t;
+  if (t<2/d1) return n1*(t-=1.5/d1)*t+0.75;
+  if (t<2.5/d1) return n1*(t-=2.25/d1)*t+0.9375;
+  return n1*(t-=2.625/d1)*t+0.984375;
+}
+// Setzt Transform/Filter für die Auf- bzw. Zuklapp-Phase je nach gewähltem Effekt
+function applyEffectPhase(effect, el, phase, t){
+  el.style.filter="";
+  switch(effect){
+    case "slideLeft":
+      if (phase==="in"){ el.style.opacity=t; el.style.transform=`translateX(${(1-easeOutCubic(t))*-70}px) scale(${0.85+0.15*t})`; }
+      else { el.style.opacity=1-t; el.style.transform=`translateX(${t*70}px) scale(${1-t*0.1})`; }
+      break;
+    case "slideRight":
+      if (phase==="in"){ el.style.opacity=t; el.style.transform=`translateX(${(1-easeOutCubic(t))*70}px) scale(${0.85+0.15*t})`; }
+      else { el.style.opacity=1-t; el.style.transform=`translateX(${-t*70}px) scale(${1-t*0.1})`; }
+      break;
+    case "dropBounce":
+      if (phase==="in"){ el.style.opacity=t; el.style.transform=`translateY(${(1-easeOutBounce(t))*-140}px) scale(${0.9+0.1*t})`; }
+      else { el.style.opacity=1-t; el.style.transform=`translateY(${t*50}px) scale(${1-t*0.1})`; }
+      break;
+    case "flipX":
+      if (phase==="in"){ el.style.opacity=t; el.style.transform=`perspective(900px) rotateX(${(1-t)*95}deg) scale(${0.92+0.08*t})`; }
+      else { el.style.opacity=1-t; el.style.transform=`perspective(900px) rotateX(${-t*95}deg) scale(${1-t*0.06})`; }
+      break;
+    case "flipY":
+      if (phase==="in"){ el.style.opacity=t; el.style.transform=`perspective(900px) rotateY(${(1-t)*95}deg) scale(${0.92+0.08*t})`; }
+      else { el.style.opacity=1-t; el.style.transform=`perspective(900px) rotateY(${-t*95}deg) scale(${1-t*0.06})`; }
+      break;
+    case "spiral":
+      if (phase==="in"){ el.style.opacity=t; el.style.transform=`scale(${0.4+0.6*t}) rotate(${(1-t)*170}deg)`; }
+      else { el.style.opacity=1-t; el.style.transform=`scale(${1+t*0.3}) rotate(${t*130}deg)`; }
+      break;
+    case "blurZoom":
+      if (phase==="in"){ el.style.opacity=t; el.style.transform=`scale(${0.7+0.3*t})`; el.style.filter=`blur(${(1-t)*16}px)`; }
+      else { el.style.opacity=1-t; el.style.transform=`scale(${1+t*0.25})`; el.style.filter=`blur(${t*12}px)`; }
+      break;
+    default: // "pop"
+      if (phase==="in"){ el.style.opacity=t; el.style.transform=`scale(${0.6+0.4*easeOutBack(t)})`; }
+      else { el.style.opacity=1-t; el.style.transform=`scale(${1+t*0.18})`; }
+  }
+}
+
 function spawnMemoryPhoto(){
   if (!photos.length) return;
   const p=photos[Math.floor(Math.random()*photos.length)];
+  const effect=pickEffect();
   const width=Math.max(120, W-PHOTO_SIDE_MARGIN*2);
   const height=Math.max(160, H-PHOTO_TOPBOTTOM_MARGIN*2);
   const el=document.createElement("div");
@@ -366,18 +560,14 @@ function spawnMemoryPhoto(){
     const glow=6+getAudioLevel().bass*26;
     el.style.boxShadow=`0 10px 46px rgba(${p.color},0.55), 0 0 ${glow}px rgba(${p.color},0.5)`;
     if (elapsed<fadeInMs){
-      const t=elapsed/fadeInMs;
-      el.style.opacity=t;
-      el.style.transform="scale("+(0.6+0.4*easeOutBack(t))+")";
+      applyEffectPhase(effect, el, "in", elapsed/fadeInMs);
     } else if (elapsed<fadeInMs+holdMs){
-      el.style.opacity=1;
+      el.style.opacity=1; el.style.filter="";
       const t=(elapsed-fadeInMs)/holdMs;
       el.style.transform="scale(1) translateY("+(Math.sin(t*Math.PI*2)*4)+"px)";
     } else if (elapsed<totalMs){
       if (!released){ released=true; slowCount=Math.max(0, slowCount-1); }
-      const t=(elapsed-fadeInMs-holdMs)/fadeOutMs;
-      el.style.opacity=1-t;
-      el.style.transform="scale("+(1+t*0.18)+")";
+      applyEffectPhase(effect, el, "out", (elapsed-fadeInMs-holdMs)/fadeOutMs);
     } else {
       if (!released){ released=true; slowCount=Math.max(0, slowCount-1); }
       heartTimers.forEach(clearTimeout);
@@ -388,7 +578,6 @@ function spawnMemoryPhoto(){
   }
   requestAnimationFrame(anim);
 }
-function easeOutBack(t){ const c1=1.70158, c3=c1+1; return 1+c3*Math.pow(t-1,3)+c1*Math.pow(t-1,2); }
 
 function spawnHeart(cx0, cy0){
   const HEARTS=["💜","💗","💖","💙"];
@@ -441,8 +630,12 @@ function shuffle(arr){ const a=arr.slice(); for(let i=a.length-1;i>0;i--){ const
 function playPlaylistTrack(i){
   if (!playlist.length) return;
   playlistIndex=((i%playlist.length)+playlist.length)%playlist.length;
-  bgMusic.src=playlist[playlistIndex];
+  const url=playlist[playlistIndex];
+  bgMusic.src=url;
   bgMusic.volume=0.55;
+  currentSchedule=analysisSchedules[url]||null;
+  scheduleIdx=0;
+  lastPhotoSpawnTs=performance.now();
   ensureAudioGraph();
   if (audioCtx && audioCtx.state==="suspended") audioCtx.resume();
   bgMusic.play().then(()=>{
