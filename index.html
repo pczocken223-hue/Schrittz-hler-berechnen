@@ -216,23 +216,23 @@ let shakeX=0, shakeY=0;
 function spawnBeatRing(hue){
   const ring=document.createElement("div");
   ring.className="beat-ring";
-  const size=Math.min(W,H)*0.15;
+  const size=Math.min(W,H)*0.12;
   ring.style.width=size+"px"; ring.style.height=size+"px";
-  ring.style.borderColor=`hsla(${hue},85%,65%,0.55)`;
+  ring.style.borderColor=`hsla(${hue},75%,65%,0.32)`;
   document.body.appendChild(ring);
-  let start=null; const dur=750;
+  let start=null; const dur=650;
   function anim(ts){
     if (!start) start=ts;
     const t=(ts-start)/dur;
     if (t>=1){ ring.remove(); return; }
-    ring.style.transform=`translate(-50%,-50%) scale(${(1+t*3.2).toFixed(2)})`;
-    ring.style.opacity=(1-t).toFixed(2);
+    ring.style.transform=`translate(-50%,-50%) scale(${(1+t*2.1).toFixed(2)})`;
+    ring.style.opacity=(0.7*(1-t)).toFixed(2);
     requestAnimationFrame(anim);
   }
   requestAnimationFrame(anim);
 }
 function triggerBeatBurst(hue){
-  const kick=6+Math.random()*5, angle=Math.random()*Math.PI*2;
+  const kick=1.5+Math.random()*2, angle=Math.random()*Math.PI*2;
   shakeX=Math.cos(angle)*kick; shakeY=Math.sin(angle)*kick;
   spawnBeatRing(hue);
 }
@@ -295,8 +295,8 @@ let flying=false, baseSpeed=0.0022, speed=0.0022, targetSpeed=0.0022;
 let zoom=1, targetZoom=1;
 let slowCount=0; // >0 während ein Erinnerungsfoto zu sehen ist
 let bassAvg=0, bassFast=0, lastPhotoSpawnTs=0, lastBeatTs=0;
-const PHOTO_MIN_GAP_MS=1600;   // frühestens wieder ein Foto, auch wenn die Musik pumpt
-const PHOTO_MAX_GAP_MS=4500;   // spätestens wieder ein Foto, auch ohne Musik/ruhige Stelle
+const PHOTO_MIN_GAP_MS=4600;   // frühestens wieder eine neue Foto-Szene (deckt die Anim.-Dauer ab, keine Überlappungen)
+const PHOTO_MAX_GAP_MS=8000;   // spätestens wieder eine Szene, auch ohne Musik/ruhige Stelle
 const BEAT_COOLDOWN_MS=260;    // verhindert, dass ein einzelner Bass-Ausschlag mehrfach zählt
 function detectBeatAndSpawnPhoto(bass){
   // Zwei EMAs: eine schnelle (folgt der aktuellen Lautstärke) und eine langsame
@@ -313,8 +313,8 @@ function detectBeatAndSpawnPhoto(bass){
   if (isBeat) lastBeatTs=now;
   if ((isBeat && gap>PHOTO_MIN_GAP_MS) || gap>PHOTO_MAX_GAP_MS){
     lastPhotoSpawnTs=now;
-    spawnMemoryPhoto();
-    if (isBeat) targetZoom=Math.min(1.4, targetZoom+0.16); // kleiner Zoom-Kick im Takt
+    spawnMemoryScene();
+    if (isBeat) targetZoom=Math.min(1.22, targetZoom+0.08); // dezenter Zoom-Kick im Takt
   }
 }
 
@@ -324,8 +324,8 @@ function scheduledPhotoCheck(){
   if (!flying || !photos.length || !currentSchedule) return;
   const t=bgMusic.currentTime;
   while (scheduleIdx<currentSchedule.length && t>=currentSchedule[scheduleIdx]){
-    spawnMemoryPhoto();
-    targetZoom=Math.min(1.4, targetZoom+0.16);
+    spawnMemoryScene();
+    targetZoom=Math.min(1.22, targetZoom+0.08);
     scheduleIdx++;
     lastPhotoSpawnTs=performance.now();
   }
@@ -472,9 +472,9 @@ folderInput.addEventListener("change", async (e)=>{
 const PHOTO_SIDE_MARGIN=12;   // 10-15px Rand links/rechts
 const PHOTO_TOPBOTTOM_MARGIN=40; // ca. 40px Rand oben/unten
 
-// Verschiedene Effekte fürs Auf- und Zuklappen der Fotos – wird bei jedem
-// Foto zufällig gewählt (nie zweimal derselbe hintereinander).
-const PHOTO_EFFECTS=["pop","slideLeft","slideRight","dropBounce","flipX","flipY","spiral","blurZoom"];
+// Dezente Effekte fürs Auf- und Zuklappen – ruhige, kleine Bewegungen statt
+// wilder Drehungen/Sprünge (das hatte vorher die "Glitches" verursacht).
+const PHOTO_EFFECTS=["fadeScale","driftUp","driftDown","driftLeft","driftRight","softBlur"];
 let lastEffect=null;
 function pickEffect(){
   let e;
@@ -482,89 +482,132 @@ function pickEffect(){
   lastEffect=e;
   return e;
 }
-function easeOutBack(t){ const c1=1.70158, c3=c1+1; return 1+c3*Math.pow(t-1,3)+c1*Math.pow(t-1,2); }
 function easeOutCubic(t){ return 1-Math.pow(1-t,3); }
-function easeOutBounce(t){
-  const n1=7.5625, d1=2.75;
-  if (t<1/d1) return n1*t*t;
-  if (t<2/d1) return n1*(t-=1.5/d1)*t+0.75;
-  if (t<2.5/d1) return n1*(t-=2.25/d1)*t+0.9375;
-  return n1*(t-=2.625/d1)*t+0.984375;
+function weightedPick(pairs){
+  const r=Math.random(); let acc=0;
+  for (const [val,w] of pairs){ acc+=w; if (r<=acc) return val; }
+  return pairs[pairs.length-1][0];
 }
-// Setzt Transform/Filter für die Auf- bzw. Zuklapp-Phase je nach gewähltem Effekt
-function applyEffectPhase(effect, el, phase, t){
+// Setzt Transform/Filter für die Auf- bzw. Zuklapp-Phase je nach gewähltem Effekt.
+// Alle Effekte bleiben bewusst dezent: kleine Distanzen, sanftes Easing.
+function applyEffectPhase(effect, el, phase, tRaw){
+  const t=Math.max(0, Math.min(1, tRaw));
+  const e=easeOutCubic(t);
   el.style.filter="";
   switch(effect){
-    case "slideLeft":
-      if (phase==="in"){ el.style.opacity=t; el.style.transform=`translateX(${(1-easeOutCubic(t))*-70}px) scale(${0.85+0.15*t})`; }
-      else { el.style.opacity=1-t; el.style.transform=`translateX(${t*70}px) scale(${1-t*0.1})`; }
+    case "driftUp":
+      if (phase==="in"){ el.style.opacity=t; el.style.transform=`translateY(${(1-e)*22}px) scale(${0.95+0.05*e})`; }
+      else { el.style.opacity=1-t; el.style.transform=`translateY(${-t*14}px) scale(${1-t*0.04})`; }
       break;
-    case "slideRight":
-      if (phase==="in"){ el.style.opacity=t; el.style.transform=`translateX(${(1-easeOutCubic(t))*70}px) scale(${0.85+0.15*t})`; }
-      else { el.style.opacity=1-t; el.style.transform=`translateX(${-t*70}px) scale(${1-t*0.1})`; }
+    case "driftDown":
+      if (phase==="in"){ el.style.opacity=t; el.style.transform=`translateY(${-(1-e)*22}px) scale(${0.95+0.05*e})`; }
+      else { el.style.opacity=1-t; el.style.transform=`translateY(${t*14}px) scale(${1-t*0.04})`; }
       break;
-    case "dropBounce":
-      if (phase==="in"){ el.style.opacity=t; el.style.transform=`translateY(${(1-easeOutBounce(t))*-140}px) scale(${0.9+0.1*t})`; }
-      else { el.style.opacity=1-t; el.style.transform=`translateY(${t*50}px) scale(${1-t*0.1})`; }
+    case "driftLeft":
+      if (phase==="in"){ el.style.opacity=t; el.style.transform=`translateX(${(1-e)*28}px) scale(${0.95+0.05*e})`; }
+      else { el.style.opacity=1-t; el.style.transform=`translateX(${-t*18}px) scale(${1-t*0.04})`; }
       break;
-    case "flipX":
-      if (phase==="in"){ el.style.opacity=t; el.style.transform=`perspective(900px) rotateX(${(1-t)*95}deg) scale(${0.92+0.08*t})`; }
-      else { el.style.opacity=1-t; el.style.transform=`perspective(900px) rotateX(${-t*95}deg) scale(${1-t*0.06})`; }
+    case "driftRight":
+      if (phase==="in"){ el.style.opacity=t; el.style.transform=`translateX(${-(1-e)*28}px) scale(${0.95+0.05*e})`; }
+      else { el.style.opacity=1-t; el.style.transform=`translateX(${t*18}px) scale(${1-t*0.04})`; }
       break;
-    case "flipY":
-      if (phase==="in"){ el.style.opacity=t; el.style.transform=`perspective(900px) rotateY(${(1-t)*95}deg) scale(${0.92+0.08*t})`; }
-      else { el.style.opacity=1-t; el.style.transform=`perspective(900px) rotateY(${-t*95}deg) scale(${1-t*0.06})`; }
+    case "softBlur":
+      if (phase==="in"){ el.style.opacity=t; el.style.transform=`scale(${0.96+0.04*e})`; el.style.filter=`blur(${(1-e)*7}px)`; }
+      else { el.style.opacity=1-t; el.style.transform=`scale(${1+t*0.03})`; el.style.filter=`blur(${t*5}px)`; }
       break;
-    case "spiral":
-      if (phase==="in"){ el.style.opacity=t; el.style.transform=`scale(${0.4+0.6*t}) rotate(${(1-t)*170}deg)`; }
-      else { el.style.opacity=1-t; el.style.transform=`scale(${1+t*0.3}) rotate(${t*130}deg)`; }
-      break;
-    case "blurZoom":
-      if (phase==="in"){ el.style.opacity=t; el.style.transform=`scale(${0.7+0.3*t})`; el.style.filter=`blur(${(1-t)*16}px)`; }
-      else { el.style.opacity=1-t; el.style.transform=`scale(${1+t*0.25})`; el.style.filter=`blur(${t*12}px)`; }
-      break;
-    default: // "pop"
-      if (phase==="in"){ el.style.opacity=t; el.style.transform=`scale(${0.6+0.4*easeOutBack(t)})`; }
-      else { el.style.opacity=1-t; el.style.transform=`scale(${1+t*0.18})`; }
+    default: // "fadeScale"
+      if (phase==="in"){ el.style.opacity=t; el.style.transform=`scale(${0.93+0.07*e})`; }
+      else { el.style.opacity=1-t; el.style.transform=`scale(${1+t*0.03})`; }
   }
 }
 
-function spawnMemoryPhoto(){
+// ---------- Layouts: mal ein großes Foto, mal zwei oder drei gleichzeitig ----------
+function pickLayout(){
+  return weightedPick([["solo",0.55],["duo",0.28],["trio",0.17]]);
+}
+function computeLayoutRects(layout){
+  const availW=W-PHOTO_SIDE_MARGIN*2, availH=H-PHOTO_TOPBOTTOM_MARGIN*2;
+  if (layout==="duo"){
+    const w=availW*0.46, h=availH*0.48;
+    const gap=availW*0.05;
+    const totalW=w*2+gap;
+    const startX=PHOTO_SIDE_MARGIN+(availW-totalW)/2;
+    const midY=PHOTO_TOPBOTTOM_MARGIN+(availH-h)/2;
+    return [
+      {x:startX, y:midY-availH*0.05, w, h},
+      {x:startX+w+gap, y:midY+availH*0.05, w, h}
+    ];
+  }
+  if (layout==="trio"){
+    const wBig=availW*0.52, hBig=availH*0.44;
+    const wSmall=availW*0.34, hSmall=availH*0.28;
+    const cx0=PHOTO_SIDE_MARGIN+availW/2;
+    return [
+      {x:cx0-wBig/2, y:PHOTO_TOPBOTTOM_MARGIN, w:wBig, h:hBig},
+      {x:PHOTO_SIDE_MARGIN, y:PHOTO_TOPBOTTOM_MARGIN+availH-hSmall, w:wSmall, h:hSmall},
+      {x:PHOTO_SIDE_MARGIN+availW-wSmall, y:PHOTO_TOPBOTTOM_MARGIN+availH-hSmall*1.15, w:wSmall, h:hSmall}
+    ];
+  }
+  // solo: meistens groß, ab und zu bewusst kleiner gehalten
+  const sizeVariant=weightedPick([["large",0.55],["medium",0.3],["small",0.15]]);
+  let w,h;
+  if (sizeVariant==="large"){ w=availW; h=availH; }
+  else if (sizeVariant==="medium"){ w=availW*0.66; h=availH*0.6; }
+  else { w=availW*0.44; h=availH*0.4; }
+  const x=PHOTO_SIDE_MARGIN+(availW-w)/2;
+  const y=PHOTO_TOPBOTTOM_MARGIN+(availH-h)/2;
+  return [{x,y,w,h}];
+}
+
+// Erzeugt eine ganze "Szene": ein bis drei Fotos, die dezent und leicht
+// versetzt hereinkommen. Zählt nach außen als EIN Foto-Ereignis (ein Gap-Takt).
+function spawnMemoryScene(){
   if (!photos.length) return;
-  const p=photos[Math.floor(Math.random()*photos.length)];
+  const layout=pickLayout();
+  const rects=computeLayoutRects(layout);
+  const used=new Set();
+  rects.forEach((rect,i)=>{
+    let idx;
+    do{ idx=Math.floor(Math.random()*photos.length); } while (photos.length>rects.length && used.has(idx));
+    used.add(idx);
+    const delay=i*180;
+    setTimeout(()=>spawnPhotoAt(photos[idx], rect, rects.length), delay);
+  });
+}
+
+function spawnPhotoAt(p, rect, sceneCount){
   const effect=pickEffect();
-  const width=Math.max(120, W-PHOTO_SIDE_MARGIN*2);
-  const height=Math.max(160, H-PHOTO_TOPBOTTOM_MARGIN*2);
   const el=document.createElement("div");
   el.className="memory-photo";
-  el.style.width=width+"px"; el.style.height=height+"px";
-  el.style.left=PHOTO_SIDE_MARGIN+"px"; el.style.top=PHOTO_TOPBOTTOM_MARGIN+"px";
+  el.style.width=rect.w+"px"; el.style.height=rect.h+"px";
+  el.style.left=rect.x+"px"; el.style.top=rect.y+"px";
   el.style.background=`linear-gradient(150deg, rgba(${p.color},0.95), rgba(${p.color},0.55))`;
-  el.style.transform="scale(0.6)";
+  el.style.opacity="0";
   el.innerHTML='<img src="'+p.src+'" alt="Erinnerung" crossorigin="anonymous">';
   document.body.appendChild(el);
 
-  const centerX=PHOTO_SIDE_MARGIN+width/2, centerY=PHOTO_TOPBOTTOM_MARGIN+height/2;
+  const centerX=rect.x+rect.w/2, centerY=rect.y+rect.h/2;
+  const heartCount=sceneCount>1?3:5;
   const heartTimers=[];
-  for (let i=0;i<5;i++){
-    heartTimers.push(setTimeout(()=>spawnHeart(centerX, centerY), 900+i*(2200/5)+Math.random()*300));
+  for (let i=0;i<heartCount;i++){
+    heartTimers.push(setTimeout(()=>spawnHeart(centerX, centerY), 700+i*(2000/heartCount)+Math.random()*280));
   }
 
   slowCount++;
-  const holdMs=2000, fadeInMs=700, fadeOutMs=900;
+  const holdMs=2600, fadeInMs=900, fadeOutMs=1100;
   const totalMs=fadeInMs+holdMs+fadeOutMs;
   let start=null, released=false;
   function anim(ts){
     if (!start) start=ts;
     const elapsed=ts-start;
-    const glow=6+getAudioLevel().bass*26;
-    el.style.boxShadow=`0 10px 46px rgba(${p.color},0.55), 0 0 ${glow}px rgba(${p.color},0.5)`;
+    const glow=6+getAudioLevel().bass*18;
+    el.style.boxShadow=`0 10px 46px rgba(${p.color},0.5), 0 0 ${glow}px rgba(${p.color},0.4)`;
     if (elapsed<fadeInMs){
       applyEffectPhase(effect, el, "in", elapsed/fadeInMs);
     } else if (elapsed<fadeInMs+holdMs){
-      el.style.opacity=1; el.style.filter="";
+      el.style.opacity="1"; el.style.filter="";
       const t=(elapsed-fadeInMs)/holdMs;
-      el.style.transform="scale(1) translateY("+(Math.sin(t*Math.PI*2)*4)+"px)";
+      el.style.transform="scale(1) translateY("+(Math.sin(t*Math.PI*2)*3)+"px)";
     } else if (elapsed<totalMs){
       if (!released){ released=true; slowCount=Math.max(0, slowCount-1); }
       applyEffectPhase(effect, el, "out", (elapsed-fadeInMs-holdMs)/fadeOutMs);
@@ -579,23 +622,31 @@ function spawnMemoryPhoto(){
   requestAnimationFrame(anim);
 }
 
+// Sanft schwebende, leicht wiegende Herzen mit dezenter Rotation
 function spawnHeart(cx0, cy0){
-  const HEARTS=["💜","💗","💖","💙"];
+  const HEARTS=["💜","💗","💖","💙","✨"];
   const heart=document.createElement("div");
   heart.className="memory-heart";
   heart.textContent=HEARTS[Math.floor(Math.random()*HEARTS.length)];
-  const startX=cx0+(Math.random()*80-40), startY=cy0+(Math.random()*60-30);
-  const fontSize=13+Math.random()*11;
+  const startX=cx0+(Math.random()*70-35), startY=cy0+(Math.random()*50-25);
+  const fontSize=12+Math.random()*10;
+  const rotStart=Math.random()*24-12;
   heart.style.left=startX+"px"; heart.style.top=startY+"px"; heart.style.fontSize=fontSize+"px";
   document.body.appendChild(heart);
-  const dur=2000+Math.random()*900, drift=(Math.random()*50-25);
+  const dur=2300+Math.random()*1000, drift=Math.random()*40-20, sway=5+Math.random()*7;
   let start=null;
   function anim(ts){
     if (!start) start=ts;
     const t=(ts-start)/dur;
     if (t>=1){ heart.remove(); return; }
-    heart.style.transform=`translate(${drift*t}px, ${-95*t}px) scale(${0.7+0.5*Math.sin(t*Math.PI)})`;
-    heart.style.opacity = t<0.15 ? t/0.15 : (t>0.75 ? (1-t)/0.25 : 1);
+    const rise=-95*t;
+    const wave=Math.sin(t*Math.PI*2.1)*sway;
+    const rot=rotStart+Math.sin(t*Math.PI*1.5)*8;
+    const scaleIn=Math.min(1, t/0.18);
+    const scaleOut=t>0.8 ? 1-((t-0.8)/0.2)*0.15 : 1;
+    const scale=(0.75+0.35*Math.sin(scaleIn*Math.PI/2))*scaleOut;
+    heart.style.transform=`translate(${(drift*t+wave).toFixed(1)}px, ${rise.toFixed(1)}px) rotate(${rot.toFixed(1)}deg) scale(${scale.toFixed(2)})`;
+    heart.style.opacity = t<0.12 ? (t/0.12).toFixed(2) : (t>0.78 ? ((1-t)/0.22).toFixed(2) : "1");
     requestAnimationFrame(anim);
   }
   requestAnimationFrame(anim);
