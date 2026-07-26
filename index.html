@@ -37,10 +37,18 @@
   #startScreen h1{ font-size:26px; margin:0; font-weight:300; letter-spacing:0.08em;
     background:linear-gradient(90deg,var(--cyan),var(--purple),var(--magenta)); -webkit-background-clip:text; background-clip:text; color:transparent; }
   #startScreen p{ margin:0; color:var(--text-dim); font-size:13px; max-width:280px; line-height:1.6; }
+  #folderBtn{ padding:13px 30px; border-radius:999px; border:1px solid rgba(34,211,238,0.4);
+    background:rgba(34,211,238,0.1); color:#fff; font-size:14px; letter-spacing:0.06em; font-family:inherit;
+    backdrop-filter:blur(6px); box-shadow:0 0 20px rgba(34,211,238,0.2); }
+  #folderBtn:active{ transform:scale(0.96); }
+  #folderBtn.chosen{ border-color:var(--cyan); background:rgba(34,211,238,0.18); }
+  #folderHint{ margin:0; color:var(--text-dim); font-size:12px; }
+  #folderHint.ready{ color:var(--cyan); }
   #startBtn{ margin-top:8px; padding:16px 44px; border-radius:999px; border:1px solid rgba(255,255,255,0.25);
     background:rgba(255,255,255,0.06); color:#fff; font-size:15px; letter-spacing:0.1em; font-family:inherit;
     backdrop-filter:blur(6px); box-shadow:0 0 30px rgba(168,85,247,0.25); }
   #startBtn:active{ transform:scale(0.96); }
+  #startBtn:disabled{ opacity:0.35; box-shadow:none; }
 
   /* Treibende Erinnerungsfotos */
   .memory-photo{ position:fixed; z-index:5; border-radius:10px; padding:8px 8px 26px; background:#f5f2ec;
@@ -84,7 +92,10 @@
 <div id="startScreen">
   <h1>UNSER UNIVERSUM</h1>
   <p>Lehn dich zurück. Du musst nichts tun – du fliegst einfach langsam hindurch, und ab und zu zieht eine Erinnerung vorbei.</p>
-  <button id="startBtn">✦ Starten ✦</button>
+  <button id="folderBtn">📁 Ordner wählen</button>
+  <p id="folderHint">Bitte zuerst den Ordner wählen</p>
+  <input type="file" id="folderInput" webkitdirectory directory multiple accept="image/*" style="display:none">
+  <button id="startBtn" disabled>✦ Starten ✦</button>
 </div>
 
 <div id="controls">
@@ -99,33 +110,17 @@
 "use strict";
 
 /* ================= KONFIGURATION =================
-   So bleibt für dich nur EIN Handgriff übrig: Fotos umbenennen
-   und in den Ordner "bilder/" im GitHub-Repo hochladen. Der Rest
-   (Pfade eintragen usw.) passiert automatisch.
+   Fotos musst du gar nicht mehr hochladen oder umbenennen: beim
+   Öffnen der Seite tippt man einfach auf "Ordner wählen" und sucht
+   den Fotoordner direkt auf dem Handy/Rechner aus. Die Bilder bleiben
+   dabei nur im Browser geladen (JPG, PNG usw. – alles wird erkannt).
 
-   SO GEHT'S:
-   1) Lege im Repo einen Ordner "bilder" an (falls noch nicht vorhanden).
-   2) Benenne deine Fotos der Reihe nach um:
-        bild-01.jpg, bild-02.jpg, bild-03.jpg, ...
-      (führende Null bei 1-9, danach ganz normal weiterzählen)
-   3) Trage unten bei PHOTO_COUNT ein, wie viele Fotos es sind.
-   4) Falls deine Fotos KEINE .jpg sind (z.B. .png), trage das bei
-      PHOTO_EXT ein.
-   Fertig – die Liste der Pfade wird automatisch daraus gebaut.
-
-   MUSIC_FILES bleibt wie gehabt: relative Pfade zu deinen Musikdateien
-   (z.B. Ordner "musik/"), die im Repo liegen.
+   MUSIC_FILES: relative Pfade zu deinen Musikdateien (z.B. Ordner
+   "musik/"), die im GitHub-Repo liegen. Alle Titel werden nacheinander
+   (zufällig gemischt) abgespielt.
 =====================================================*/
-const PHOTO_FOLDER="bilder/";   // Ordnername im Repo
-const PHOTO_COUNT=12;           // <-- Anzahl deiner Fotos hier eintragen
-const PHOTO_EXT="jpg";          // <-- Dateiendung: jpg, jpeg oder png
-
-const PHOTO_FILES=Array.from({length:PHOTO_COUNT}, (_, i) =>
-  `${PHOTO_FOLDER}bild-${String(i+1).padStart(2,"0")}.${PHOTO_EXT}`
-);
-
 const MUSIC_FILES=[
-
+  "song1.mp3"
 ];
 
 const toastEl=document.getElementById("toast");
@@ -284,20 +279,12 @@ document.getElementById("startBtn").onclick=()=>{
   startPlaylist();
 };
 
-// ---------- Fotos (direkt aus dem GitHub-Repo geladen, wie die Musik) ----------
+// ---------- Fotos (per Ordner-Auswahl direkt vom Gerät geladen) ----------
 let photos=[];
-
-async function loadPhotosFromFiles(){
-  for (const path of PHOTO_FILES){
-    const color=await getDominantColor(path);
-    photos.push({src:path, color});
-  }
-}
 
 function getDominantColor(dataUrl){
   return new Promise((resolve)=>{
     const img=new Image();
-    img.crossOrigin="anonymous";
     img.onload=()=>{
       const c=document.createElement("canvas"); c.width=20; c.height=20;
       const cx2=c.getContext("2d"); cx2.drawImage(img,0,0,20,20);
@@ -313,7 +300,31 @@ function getDominantColor(dataUrl){
   });
 }
 
-loadPhotosFromFiles();
+const IMAGE_EXT_RE=/\.(jpe?g|png|gif|webp)$/i;
+const folderBtn=document.getElementById("folderBtn");
+const folderInput=document.getElementById("folderInput");
+const folderHint=document.getElementById("folderHint");
+const startBtnEl=document.getElementById("startBtn");
+
+folderBtn.onclick=()=>folderInput.click();
+
+folderInput.addEventListener("change", async (e)=>{
+  const files=Array.from(e.target.files).filter(f=>IMAGE_EXT_RE.test(f.name));
+  if (!files.length){ showToast("Keine Bilder in diesem Ordner gefunden"); return; }
+  folderHint.textContent="Fotos werden geladen …";
+  photos=[];
+  for (const file of files){
+    const url=URL.createObjectURL(file);
+    const color=await getDominantColor(url);
+    photos.push({src:url, color});
+  }
+  folderBtn.classList.add("chosen");
+  folderBtn.textContent="📁 "+photos.length+" Fotos ausgewählt";
+  folderHint.textContent=photos.length+" Fotos geladen ✓";
+  folderHint.classList.add("ready");
+  startBtnEl.disabled=false;
+  showToast(photos.length+" Fotos geladen");
+});
 
 const PHOTO_SIDE_MARGIN=12;   // 10-15px Rand links/rechts
 const PHOTO_TOPBOTTOM_MARGIN=40; // ca. 40px Rand oben/unten
