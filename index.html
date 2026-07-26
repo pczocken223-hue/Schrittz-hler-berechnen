@@ -182,15 +182,23 @@ for (let i=0;i<STAR_COUNT;i++) stars.push(makeStar());
 let flying=false, baseSpeed=0.0022, speed=0.0022, targetSpeed=0.0022;
 let zoom=1, targetZoom=1;
 let slowCount=0; // >0 während ein Erinnerungsfoto zu sehen ist
-let bassAvg=0, lastPhotoSpawnTs=0;
-const PHOTO_MIN_GAP_MS=3800;   // frühestens wieder ein Foto, auch wenn die Musik pumpt
-const PHOTO_MAX_GAP_MS=11000;  // spätestens wieder ein Foto, auch ohne Musik/ruhige Stelle
+let bassAvg=0, bassFast=0, lastPhotoSpawnTs=0, lastBeatTs=0;
+const PHOTO_MIN_GAP_MS=1600;   // frühestens wieder ein Foto, auch wenn die Musik pumpt
+const PHOTO_MAX_GAP_MS=4500;   // spätestens wieder ein Foto, auch ohne Musik/ruhige Stelle
+const BEAT_COOLDOWN_MS=260;    // verhindert, dass ein einzelner Bass-Ausschlag mehrfach zählt
 function detectBeatAndSpawnPhoto(bass){
-  bassAvg += (bass-bassAvg)*0.04;
+  // Zwei EMAs: eine schnelle (folgt der aktuellen Lautstärke) und eine langsame
+  // (Baseline). Ein Beat ist ein kurzer Ausschlag der schnellen über die langsame.
+  bassFast += (bass-bassFast)*0.35;
+  bassAvg  += (bass-bassAvg)*0.04;
   const now=performance.now();
   if (!flying || !photos.length) return;
   const gap=now-lastPhotoSpawnTs;
-  const isBeat = bass>0.32 && bass>bassAvg*1.3;
+  const sinceBeat=now-lastBeatTs;
+  // Kleine Mindestlautstärke, damit Stille nicht als Beat zählt, aber kein starrer
+  // Absolutwert mehr – funktioniert dadurch auch bei leiseren Songs/Passagen.
+  const isBeat = bass>0.06 && bassFast>bassAvg*1.22 && sinceBeat>BEAT_COOLDOWN_MS;
+  if (isBeat) lastBeatTs=now;
   if ((isBeat && gap>PHOTO_MIN_GAP_MS) || gap>PHOTO_MAX_GAP_MS){
     lastPhotoSpawnTs=now;
     spawnMemoryPhoto();
@@ -275,7 +283,7 @@ document.getElementById("startBtn").onclick=()=>{
   document.getElementById("controls").classList.add("show");
   document.getElementById("hint").classList.add("show");
   setTimeout(()=>document.getElementById("hint").classList.remove("show"), 6000);
-  lastPhotoSpawnTs=performance.now()-(PHOTO_MAX_GAP_MS-5000); // erstes Foto nach ca. 5s
+  lastPhotoSpawnTs=performance.now()-(PHOTO_MAX_GAP_MS-2000); // erstes Foto nach ca. 2s
   startPlaylist();
 };
 
@@ -349,7 +357,7 @@ function spawnMemoryPhoto(){
   }
 
   slowCount++;
-  const holdMs=3200, fadeInMs=1100, fadeOutMs=1300;
+  const holdMs=2000, fadeInMs=700, fadeOutMs=900;
   const totalMs=fadeInMs+holdMs+fadeOutMs;
   let start=null, released=false;
   function anim(ts){
