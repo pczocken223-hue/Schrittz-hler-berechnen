@@ -3,80 +3,117 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<title>Unser Universum</title>
-<meta name="theme-color" content="#05020c">
+<title>Unser Liebesuniversum</title>
+<meta name="theme-color" content="#12030a">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,500;1,400&family=Quicksand:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
-    --cyan:#22d3ee; --purple:#a855f7; --magenta:#ec4899; --text:#e9e4f7; --text-dim:#9a8fc2;
+    --rose:#ff5d8f; --gold:#ffc27a; --wine:#8a2955; --blush:#ffd9e3;
+    --text:#fdeef2; --text-dim:#e2a9c0;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none;}
-  html,body{ height:100%; margin:0; overflow:hidden; background:#03010a; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; color:var(--text); }
+  html,body{ height:100%; height:100dvh; margin:0; overflow:hidden; background:#0f0207; font-family:'Quicksand',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; color:var(--text); }
 
-  #nebula{ position:fixed; inset:-20%; z-index:0;
-    background:
-      radial-gradient(circle at 20% 30%, rgba(168,85,247,0.16), transparent 45%),
-      radial-gradient(circle at 80% 70%, rgba(34,211,238,0.14), transparent 45%),
-      radial-gradient(circle at 55% 85%, rgba(236,72,153,0.12), transparent 40%),
-      #03010a;
-    animation:nebulaDrift 60s linear infinite;
-    filter:hue-rotate(0deg) saturate(1) brightness(1);
-    will-change:filter;
-  }
-  @keyframes nebulaDrift{ 0%{ transform:rotate(0deg) scale(1); } 100%{ transform:rotate(360deg) scale(1); } }
+  /* Ruhiger, weicher "Nebel"-Hintergrund: sehr langsame, kleine Bewegungen statt
+     hektischer Pulse. Die Musik beeinflusst nur noch ein sehr sanftes, langsames
+     Glühen (siehe updateBackgroundColor), keine ruckartigen Sprünge mehr. */
+  #bgLayer{ position:fixed; inset:0; z-index:0; overflow:hidden;
+    filter:hue-rotate(0deg) saturate(1) brightness(1); will-change:filter; }
+  #nebulaBase{ position:absolute; inset:-10%;
+    background:radial-gradient(ellipse at 50% 32%, #22091a 0%, #150610 45%, #0c0309 75%, #080104 100%); }
+  .orb{ position:absolute; border-radius:50%; filter:blur(min(11vw,90px)); mix-blend-mode:screen; will-change:transform; }
+  #orb1{ width:74vmax; height:74vmax; top:-28%; left:-22%; opacity:0.4;
+    background:radial-gradient(circle, rgba(200,80,120,0.6) 0%, rgba(200,80,120,0) 70%);
+    animation:orbFloat1 70s ease-in-out infinite; }
+  #orb2{ width:60vmax; height:60vmax; bottom:-22%; right:-16%; opacity:0.32;
+    background:radial-gradient(circle, rgba(200,150,110,0.55) 0%, rgba(200,150,110,0) 70%);
+    animation:orbFloat2 84s ease-in-out infinite; }
+  #orb3{ width:54vmax; height:54vmax; top:28%; left:36%; opacity:0.32;
+    background:radial-gradient(circle, rgba(160,60,110,0.55) 0%, rgba(160,60,110,0) 70%);
+    animation:orbFloat3 92s ease-in-out infinite; }
+  #orb4{ width:42vmax; height:42vmax; top:55%; left:-8%; opacity:0.26;
+    background:radial-gradient(circle, rgba(190,110,140,0.5) 0%, rgba(190,110,140,0) 70%);
+    animation:orbFloat4 100s ease-in-out infinite; }
+  @keyframes orbFloat1{ 0%,100%{ transform:translate(0,0) scale(1); } 50%{ transform:translate(6%,5%) scale(1.06); } }
+  @keyframes orbFloat2{ 0%,100%{ transform:translate(0,0) scale(1); } 50%{ transform:translate(-5%,-4%) scale(1.05); } }
+  @keyframes orbFloat3{ 0%,100%{ transform:translate(-3%,2%) scale(1); } 50%{ transform:translate(4%,-5%) scale(1.07); } }
+  @keyframes orbFloat4{ 0%,100%{ transform:translate(0,0) scale(1); } 50%{ transform:translate(4%,-3%) scale(1.06); } }
 
-  /* Farb-Flash im Takt der Musik – legt sich additiv ueber den Nebel */
+  /* Dezentes Filmkorn für Tiefe statt eines flachen Verlaufs */
+  #grain{ position:fixed; inset:0; z-index:0; pointer-events:none; opacity:0.03; mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+
+
+
+  /* Vignette – zieht den Blick in die Mitte, macht den Hintergrund "satt" statt flach */
+  #vignette{ position:fixed; inset:0; z-index:3; pointer-events:none;
+    background:radial-gradient(ellipse at 50% 45%, transparent 32%, rgba(6,1,3,0.8) 100%); }
+
+  /* Farb-Flash im Takt der Musik – legt sich additiv ueber den Hintergrund */
   #colorFlash{ position:fixed; inset:-20%; z-index:0; pointer-events:none; mix-blend-mode:screen; will-change:background; }
 
   #starCanvas{ position:fixed; inset:0; z-index:1; display:block; }
 
+  /* Sanfte Herzen, die unabhängig vom Takt immer wieder aufsteigen, pulsieren aber mit dem Bass */
+  #ambientLayer{ position:fixed; inset:0; z-index:2; pointer-events:none; overflow:hidden; }
+  .ambient-heart{ position:absolute; opacity:0; will-change:transform,opacity; filter:drop-shadow(0 0 6px rgba(255,93,143,0.5)); }
+
   /* Startbildschirm */
   #startScreen{ position:fixed; inset:0; z-index:50; display:flex; flex-direction:column; align-items:center; justify-content:center;
-    gap:22px; text-align:center; padding:0 30px; background:rgba(3,1,10,0.35); backdrop-filter:blur(2px);
+    gap:20px; text-align:center; padding:0 30px; background:rgba(15,2,7,0.35); backdrop-filter:blur(2px);
     transition:opacity .9s ease; }
   #startScreen.hidden{ opacity:0; pointer-events:none; }
-  #startScreen h1{ font-size:26px; margin:0; font-weight:300; letter-spacing:0.08em;
-    background:linear-gradient(90deg,var(--cyan),var(--purple),var(--magenta)); -webkit-background-clip:text; background-clip:text; color:transparent; }
-  #startScreen p{ margin:0; color:var(--text-dim); font-size:13px; max-width:280px; line-height:1.6; }
-  #folderBtn{ padding:13px 30px; border-radius:999px; border:1px solid rgba(34,211,238,0.4);
-    background:rgba(34,211,238,0.1); color:#fff; font-size:14px; letter-spacing:0.06em; font-family:inherit;
-    backdrop-filter:blur(6px); box-shadow:0 0 20px rgba(34,211,238,0.2); }
+  #startScreen .eyebrow{ font-family:'Quicksand',sans-serif; letter-spacing:0.35em; font-size:10.5px; color:var(--text-dim);
+    text-transform:uppercase; opacity:0.85; }
+  #startScreen h1{ font-family:'Cormorant Garamond',serif; font-style:italic; font-size:40px; margin:0; font-weight:500; letter-spacing:0.02em;
+    background:linear-gradient(90deg,var(--gold),var(--rose),#ff8fb3); -webkit-background-clip:text; background-clip:text; color:transparent;
+    line-height:1.15; }
+  #startScreen p{ margin:0; color:var(--text-dim); font-size:13.5px; max-width:300px; line-height:1.7; }
+  #folderBtn{ padding:13px 30px; border-radius:999px; border:1px solid rgba(255,93,143,0.45);
+    background:rgba(255,93,143,0.12); color:#fff; font-size:14px; letter-spacing:0.04em; font-family:inherit;
+    backdrop-filter:blur(6px); box-shadow:0 0 20px rgba(255,93,143,0.25); }
   #folderBtn:active{ transform:scale(0.96); }
-  #folderBtn.chosen{ border-color:var(--cyan); background:rgba(34,211,238,0.18); }
+  #folderBtn.chosen{ border-color:var(--gold); background:rgba(255,194,122,0.16); }
   #folderHint{ margin:0; color:var(--text-dim); font-size:12px; }
-  #folderHint.ready{ color:var(--cyan); }
-  #startBtn{ margin-top:8px; padding:16px 44px; border-radius:999px; border:1px solid rgba(255,255,255,0.25);
-    background:rgba(255,255,255,0.06); color:#fff; font-size:15px; letter-spacing:0.1em; font-family:inherit;
-    backdrop-filter:blur(6px); box-shadow:0 0 30px rgba(168,85,247,0.25); }
+  #folderHint.ready{ color:var(--gold); }
+  #startBtn{ margin-top:6px; padding:16px 46px; border-radius:999px; border:1px solid rgba(255,217,227,0.35);
+    background:rgba(255,255,255,0.07); color:#fff; font-size:15px; letter-spacing:0.08em; font-family:'Quicksand',sans-serif; font-weight:600;
+    backdrop-filter:blur(6px); box-shadow:0 0 30px rgba(255,93,143,0.35); }
   #startBtn:active{ transform:scale(0.96); }
   #startBtn:disabled{ opacity:0.35; box-shadow:none; }
 
   /* Treibende Erinnerungsfotos */
-  .memory-photo{ position:fixed; z-index:5; border-radius:10px; padding:8px 8px 26px; background:#f5f2ec;
-    box-shadow:0 10px 40px rgba(0,0,0,0.55); opacity:0; pointer-events:none; }
+  .memory-photo{ position:fixed; z-index:5; border-radius:10px; padding:8px 8px 26px; background:#fff6f2;
+    box-shadow:0 10px 40px rgba(60,0,20,0.55); opacity:0; pointer-events:none; }
   .memory-photo img{ display:block; width:100%; height:100%; object-fit:cover; border-radius:4px; }
+  .memory-photo::after{ content:"♥"; position:absolute; top:-11px; right:14px; font-size:20px; color:var(--rose);
+    text-shadow:0 0 8px rgba(255,93,143,0.7); transform:rotate(-14deg); }
 
   /* Kleine Herzchen, die beim Erscheinen eines Fotos aufsteigen */
   .memory-heart{ position:fixed; z-index:6; pointer-events:none; opacity:0; line-height:1;
-    text-shadow:0 0 10px rgba(236,72,153,0.6); will-change:transform,opacity; }
+    text-shadow:0 0 10px rgba(255,93,143,0.65); will-change:transform,opacity; }
 
   /* Steuerung */
   #controls{ position:fixed; left:0; right:0; bottom:0; z-index:40; display:flex; justify-content:center; gap:12px;
     padding:14px 16px calc(14px + env(safe-area-inset-bottom)); opacity:0; transition:opacity .6s ease; pointer-events:none; }
   #controls.show{ opacity:1; pointer-events:auto; }
-  .ctrl-btn{ width:50px; height:50px; border-radius:50%; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.16);
+  .ctrl-btn{ width:50px; height:50px; border-radius:50%; background:rgba(255,255,255,0.08); border:1px solid rgba(255,217,227,0.2);
     backdrop-filter:blur(8px); color:#fff; font-size:19px; display:flex; align-items:center; justify-content:center;
-    box-shadow:0 0 10px rgba(168,85,247,0.25); will-change:box-shadow; transition:box-shadow .08s linear; }
+    box-shadow:0 0 10px rgba(255,93,143,0.3); will-change:box-shadow; transition:box-shadow .08s linear; }
   .ctrl-btn:active{ transform:scale(0.92); }
-  .ctrl-btn.active{ border-color:var(--cyan); box-shadow:0 0 16px rgba(34,211,238,0.4); }
+  .ctrl-btn.active{ border-color:var(--gold); box-shadow:0 0 16px rgba(255,194,122,0.45); }
 
   #hint{ position:fixed; top:calc(16px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%); z-index:40;
-    font-size:11px; color:var(--text-dim); background:rgba(255,255,255,0.05); padding:6px 14px; border-radius:999px;
-    opacity:0; transition:opacity .6s ease .3s; pointer-events:none; text-align:center; max-width:80%; }
+    font-size:12px; font-family:'Cormorant Garamond',serif; font-style:italic; letter-spacing:0.01em; color:var(--blush);
+    background:rgba(138,41,85,0.22); padding:7px 18px; border-radius:999px; border:1px solid rgba(255,217,227,0.12);
+    opacity:0; transition:opacity 1s ease; pointer-events:none; text-align:center; max-width:82%; }
   #hint.show{ opacity:1; }
 
   .toast{ position:fixed; top:16px; left:50%; transform:translateX(-50%); z-index:200;
-    background:linear-gradient(135deg,#7c3aed,var(--magenta)); color:#fff; padding:10px 18px; border-radius:999px;
-    font-size:13px; font-weight:600; box-shadow:0 6px 24px rgba(236,72,153,0.4); opacity:0; pointer-events:none;
+    background:linear-gradient(135deg,#c23c68,var(--rose)); color:#fff; padding:10px 18px; border-radius:999px;
+    font-size:13px; font-weight:600; box-shadow:0 6px 24px rgba(255,93,143,0.4); opacity:0; pointer-events:none;
     transition:opacity .3s; }
   .toast.show{ opacity:1; }
 
@@ -86,19 +123,29 @@
 </head>
 <body>
 
-<div id="nebula"></div>
+<div id="bgLayer">
+  <div id="nebulaBase"></div>
+  <div class="orb" id="orb1"></div>
+  <div class="orb" id="orb2"></div>
+  <div class="orb" id="orb3"></div>
+  <div class="orb" id="orb4"></div>
+</div>
+<div id="grain"></div>
 <div id="colorFlash"></div>
 <canvas id="starCanvas"></canvas>
+<div id="ambientLayer"></div>
+<div id="vignette"></div>
 
-<div id="hint">Ab und zu zieht eine Erinnerung vorbei</div>
+<div id="hint">Jeder Herzschlag hier war ein Moment mit dir</div>
 
 <div id="startScreen">
-  <h1>UNSER UNIVERSUM</h1>
-  <p>Lehn dich zurück. Du musst nichts tun – du fliegst einfach langsam hindurch, und ab und zu zieht eine Erinnerung vorbei.</p>
-  <button id="folderBtn">📁 Ordner wählen</button>
-  <p id="folderHint">Bitte zuerst den Ordner wählen</p>
+  <div class="eyebrow">für dich, immer</div>
+  <h1>Unser Liebesuniversum</h1>
+  <p>Lehn dich zurück, mein Schatz. Du musst nichts tun – wir fliegen langsam gemeinsam hindurch, durch ein Meer aus Herzen, und ab und zu taucht eine Erinnerung an uns auf.</p>
+  <button id="folderBtn">💌 Eure Fotos wählen</button>
+  <p id="folderHint">Bitte zuerst den Ordner mit euren Fotos wählen</p>
   <input type="file" id="folderInput" webkitdirectory directory multiple accept="image/*" style="display:none">
-  <button id="startBtn" disabled>✦ Starten ✦</button>
+  <button id="startBtn" disabled>✦ Unsere Reise beginnt ✦</button>
 </div>
 
 <div id="controls">
@@ -114,20 +161,44 @@
 
 /* ================= KONFIGURATION =================
    Fotos musst du gar nicht mehr hochladen oder umbenennen: beim
-   Öffnen der Seite tippt man einfach auf "Ordner wählen" und sucht
+   Öffnen der Seite tippt man einfach auf "Eure Fotos wählen" und sucht
    den Fotoordner direkt auf dem Handy/Rechner aus. Die Bilder bleiben
    dabei nur im Browser geladen (JPG, PNG usw. – alles wird erkannt).
 
-   MUSIC_FILES: relative Pfade zu deinen Musikdateien (z.B. Ordner
+   MUSIC_FILES: relative Pfade zu euren Musikdateien (z.B. Ordner
    "musik/"), die im GitHub-Repo liegen. Alle Titel werden nacheinander
    (zufällig gemischt) abgespielt.
+
+   LOVE_LINES: kleine, kurze Liebesbotschaften, die ab und zu oben
+   eingeblendet werden. Beliebig anpassbar/erweiterbar.
 =====================================================*/
 const MUSIC_FILES=[
   "song1.mp3"
 ];
 
+const LOVE_LINES=[
+  "Jeder Herzschlag hier war ein Moment mit dir",
+  "Mit dir fühlt sich jeder Tag wie ein Wunder an",
+  "Du bist das Zuhause, das ich nie gesucht, aber immer gefunden habe",
+  "Egal wie viele Sterne – keiner leuchtet wie du",
+  "Ich würde dieses Universum immer wieder mit dir bereisen",
+  "Danke, dass du meine Person bist"
+];
+
 const toastEl=document.getElementById("toast");
 function showToast(t){ toastEl.textContent=t; toastEl.classList.add("show"); setTimeout(()=>toastEl.classList.remove("show"), 2200); }
+
+// ---------- Rotierende Liebesbotschaften im Hint-Banner ----------
+const hintEl=document.getElementById("hint");
+let loveLineIdx=0;
+function cycleLoveLines(){
+  loveLineIdx=(loveLineIdx+1)%LOVE_LINES.length;
+  hintEl.classList.remove("show");
+  setTimeout(()=>{
+    hintEl.textContent=LOVE_LINES[loveLineIdx];
+    hintEl.classList.add("show");
+  }, 700);
+}
 
 // ---------- Song-Vorab-Analyse ----------
 // Statt nur live auf die Musik zu reagieren, wird der komplette Track einmal
@@ -196,19 +267,29 @@ function buildPhotoSchedule(beatTimes, duration){
 
 async function analyzeAllTracks(){
   ensureAudioGraph();
-  if (!audioCtx) return; // kein Web-Audio verfügbar -> bleibt bei Live-Erkennung
-  for (const url of MUSIC_FILES){
-    if (url in analysisSchedules) continue;
-    try{
-      const resp=await fetch(url);
-      const arrBuf=await resp.arrayBuffer();
-      const audioBuffer=await audioCtx.decodeAudioData(arrBuf);
-      analysisSchedules[url]=buildPhotoSchedule(extractBeatTimes(audioBuffer), audioBuffer.duration);
-    }catch(e){
-      console.warn("Musikanalyse fehlgeschlagen für "+url+" – nutze Live-Erkennung.", e);
-      analysisSchedules[url]=null;
+  // Egal ob die Seite per Doppelklick (file://) oder über GitHub Pages/einen
+  // Server (https://) geöffnet wird: Falls die Vorab-Analyse aus irgendeinem
+  // Grund nicht möglich ist (z.B. weil manche Browser bei file:// den fetch()
+  // von Dateien blockieren), springt automatisch die Live-Takterkennung ein –
+  // die Fotos bleiben so IMMER synchron zur Musik, nur die Methode ändert sich.
+  let anyFailed=false;
+  if (!audioCtx){ anyFailed=true; }
+  else{
+    for (const url of MUSIC_FILES){
+      if (url in analysisSchedules) continue;
+      try{
+        const resp=await fetch(url);
+        const arrBuf=await resp.arrayBuffer();
+        const audioBuffer=await audioCtx.decodeAudioData(arrBuf);
+        analysisSchedules[url]=buildPhotoSchedule(extractBeatTimes(audioBuffer), audioBuffer.duration);
+      }catch(e){
+        console.warn("Musikanalyse fehlgeschlagen für "+url+" – nutze automatisch Live-Erkennung.", e);
+        analysisSchedules[url]=null;
+        anyFailed=true;
+      }
     }
   }
+  if (anyFailed) showToast("Live-Takterkennung aktiv – läuft trotzdem synchron ✓");
 }
 
 // ---------- Beat-Burst: Ring-Effekt + kleiner Kamera-Kick ----------
@@ -218,7 +299,7 @@ function spawnBeatRing(hue){
   ring.className="beat-ring";
   const size=Math.min(W,H)*0.12;
   ring.style.width=size+"px"; ring.style.height=size+"px";
-  ring.style.borderColor=`hsla(${hue},75%,65%,0.32)`;
+  ring.style.borderColor=`hsla(${hue},80%,68%,0.34)`;
   document.body.appendChild(ring);
   let start=null; const dur=650;
   function anim(ts){
@@ -238,65 +319,108 @@ function triggerBeatBurst(hue){
 }
 
 // ---------- Bewegliche Hintergrundfarbe im Musikrhythmus ----------
-const nebulaEl=document.getElementById("nebula");
+const nebulaEl=document.getElementById("bgLayer");
 const flashEl=document.getElementById("colorFlash");
 const controlsEl=document.getElementById("controls");
 let hueRotation=0;               // dreht sich staendig langsam weiter -> Hintergrund "wandert" farblich
-let flashHue=0, flashAlpha=0, lastColorBeatTs=0;
+let flashHue=340, flashAlpha=0, lastColorBeatTs=0;
 const COLOR_BEAT_COOLDOWN_MS=240;                 // Mindestabstand zwischen zwei Farb-Blitzen
-const BEAT_HUES=[0, 340, 285, 195, 15];            // rot, magenta, lila, cyan, orange-rot -> "ab und zu mal rot"
+const BEAT_HUES=[340, 350, 15, 45, 320];           // pink, rose-rot, orange-gold, gold, magenta -> warme Liebes-Palette
+// beatPulse: 0..1, springt bei jedem erkannten Takt hoch und klingt dann ab.
+// Wird von den Sternen-Herzen, den ambienten Herzen und den Erinnerungsfotos
+// gelesen, damit ALLES im selben Rhythmus mitschwingt statt nur der Hintergrund.
+let beatPulse=0;
+let smoothOverall=0; // stark geglättetes Energie-Level für ein ruhiges, langsames Glühen
 function updateBackgroundColor(audio, now){
-  // Grunddrehung: immer in Bewegung, wird bei mehr Pegel etwas schneller
-  hueRotation=(hueRotation + 0.045 + audio.overall*0.22) % 360;
-  const sat=1 + audio.bass*0.9;
-  const bri=1 + audio.bass*0.22;
+  // Ganz langsame, gleichmäßige Grunddrehung – unabhängig von der Musik, damit
+  // der Hintergrund niemals hektisch wirkt, nur ruhig "lebt".
+  hueRotation=(hueRotation + 0.006) % 40;
+
+  // Sehr stark geglättetes Gesamt-Level (kein Springen von Frame zu Frame),
+  // sorgt für ein langsames, weiches Auf- und Abschwellen statt eines Blitzes.
+  smoothOverall += (audio.overall - smoothOverall) * 0.008;
+  const sat=1 + smoothOverall*0.18;
+  const bri=1 + smoothOverall*0.05;
   nebulaEl.style.filter=`hue-rotate(${hueRotation.toFixed(1)}deg) saturate(${sat.toFixed(2)}) brightness(${bri.toFixed(2)})`;
 
-  // Kraeftiger Farbblitz im Takt (nur bei echtem Bass-Ausschlag, mit Abklingzeit)
-  const isColorBeat = audio.bass>0.38 && (now-lastColorBeatTs)>COLOR_BEAT_COOLDOWN_MS;
+  // Nur bei einem wirklich kräftigen Bass-Ausschlag ein ganz sanftes, langsam
+  // ausklingendes Glühen – kein Blitzen, kein Ring, keine Kamera-Erschütterung.
+  const isColorBeat = audio.bass>0.5 && (now-lastColorBeatTs)>COLOR_BEAT_COOLDOWN_MS;
   if (isColorBeat){
     lastColorBeatTs=now;
     flashHue=BEAT_HUES[Math.floor(Math.random()*BEAT_HUES.length)];
-    flashAlpha=Math.min(0.6, 0.28 + audio.bass*0.45);
-    triggerBeatBurst(flashHue);
+    flashAlpha=Math.min(0.16, 0.08 + audio.bass*0.1);
+    beatPulse=1;
   }
-  flashAlpha*=0.90; // schnelles, weiches Abklingen bis zum naechsten Beat
+  flashAlpha*=0.965; // deutlich langsameres, weicheres Abklingen
+  beatPulse*=0.9;
   flashEl.style.background=
-    `radial-gradient(circle at 50% 42%, hsla(${flashHue},85%,55%,${flashAlpha.toFixed(3)}) 0%, hsla(${flashHue},85%,45%,0) 65%)`;
+    `radial-gradient(circle at 50% 42%, hsla(${flashHue},55%,55%,${flashAlpha.toFixed(3)}) 0%, hsla(${flashHue},55%,50%,0) 60%)`;
 
-  // Steuerung pulsiert im selben Takt mit
-  const glowSize=(10+audio.bass*30).toFixed(0);
-  const glowAlpha=Math.min(0.75, 0.22 + flashAlpha*0.7 + audio.bass*0.35).toFixed(2);
-  controlsEl.style.filter=`drop-shadow(0 0 ${glowSize}px hsla(${flashHue},85%,55%,${glowAlpha}))`;
+  // Steuerung bekommt nur noch ein ganz leichtes, ruhiges Glühen
+  const glowSize=(6+smoothOverall*10).toFixed(0);
+  const glowAlpha=Math.min(0.35, 0.14 + flashAlpha*0.4).toFixed(2);
+  controlsEl.style.filter=`drop-shadow(0 0 ${glowSize}px hsla(${flashHue},55%,55%,${glowAlpha}))`;
 }
 
-// ---------- Sternenfeld (Warp-Flug) ----------
+// ---------- Herzfeld (Warp-Flug durch ein Meer aus Herzen) ----------
 const canvas=document.getElementById("starCanvas");
 const ctx=canvas.getContext("2d");
 let W=0, H=0, cx=0, cy=0;
 function resize(){ W=canvas.width=window.innerWidth; H=canvas.height=window.innerHeight; cx=W/2; cy=H/2; }
 resize(); window.addEventListener("resize", resize);
 
-const STAR_COUNT=160;
-const STAR_COLORS=["255,255,255","190,225,255","220,190,255","255,210,240"];
+const STAR_COUNT=150;
+const STAR_COLORS=["255,150,180", "255,105,140", "255,190,120", "255,222,230", "230,90,150"];
 let stars=[];
+// Extreme Größenvarianz: die meisten Herzen sind klein/mittel, aber ab und zu
+// fliegt ein richtig großes, dramatisches Herz vorbei.
+function pickHeartSizeFactor(){
+  return weightedPick([[0.45,0.34],[0.8,0.28],[1.3,0.2],[2.2,0.12],[3.4,0.06]]);
+}
 function makeStar(){
   return {
     x:(Math.random()*2-1), y:(Math.random()*2-1), // -1..1 normalized
     z:Math.random()*1+0.1,
     c:STAR_COLORS[Math.floor(Math.random()*STAR_COLORS.length)],
+    sizeFactor:pickHeartSizeFactor(),
     tf:1.2+Math.random()*2.6, tp:Math.random()*Math.PI*2,
     flareAt: 3+Math.random()*20, flareDur:0.4+Math.random()*0.35 // ab und zu extra funkeln
   };
 }
 for (let i=0;i<STAR_COUNT;i++) stars.push(makeStar());
 
-let flying=false, baseSpeed=0.0022, speed=0.0022, targetSpeed=0.0022;
+// Zeichnet ein kleines gefülltes Herz statt eines simplen Punktes
+function drawHeart(ctx, x, y, size, colorRgb, alpha){
+  if (size<1.1){ // ganz kleine, ferne Herzen bleiben schlichte Punkte (Performance + Optik)
+    ctx.beginPath();
+    ctx.fillStyle=`rgba(${colorRgb},${alpha})`;
+    ctx.arc(x, y, size, 0, Math.PI*2);
+    ctx.fill();
+    return;
+  }
+  ctx.save();
+  ctx.translate(x,y);
+  const s=size/6;
+  ctx.scale(s,s);
+  ctx.beginPath();
+  ctx.moveTo(0,2.2);
+  ctx.bezierCurveTo(0,-1.6,-4.6,-1.6,-4.6,1.4);
+  ctx.bezierCurveTo(-4.6,4.4,-2.2,6,0,8.2);
+  ctx.bezierCurveTo(2.2,6,4.6,4.4,4.6,1.4);
+  ctx.bezierCurveTo(4.6,-1.6,0,-1.6,0,2.2);
+  ctx.closePath();
+  ctx.fillStyle=`rgba(${colorRgb},${alpha})`;
+  ctx.fill();
+  ctx.restore();
+}
+
+let flying=false, baseSpeed=0.0015, speed=0.0015, targetSpeed=0.0015;
 let zoom=1, targetZoom=1;
 let slowCount=0; // >0 während ein Erinnerungsfoto zu sehen ist
 let bassAvg=0, bassFast=0, lastPhotoSpawnTs=0, lastBeatTs=0;
-const PHOTO_MIN_GAP_MS=4600;   // frühestens wieder eine neue Foto-Szene (deckt die Anim.-Dauer ab, keine Überlappungen)
-const PHOTO_MAX_GAP_MS=8000;   // spätestens wieder eine Szene, auch ohne Musik/ruhige Stelle
+const PHOTO_MIN_GAP_MS=3000;   // frühestens wieder eine neue Foto-Szene
+const PHOTO_MAX_GAP_MS=5000;   // spätestens wieder eine Szene, auch ohne Musik/ruhige Stelle
 const BEAT_COOLDOWN_MS=260;    // verhindert, dass ein einzelner Bass-Ausschlag mehrfach zählt
 function detectBeatAndSpawnPhoto(bass){
   // Zwei EMAs: eine schnelle (folgt der aktuellen Lautstärke) und eine langsame
@@ -309,7 +433,7 @@ function detectBeatAndSpawnPhoto(bass){
   const sinceBeat=now-lastBeatTs;
   // Kleine Mindestlautstärke, damit Stille nicht als Beat zählt, aber kein starrer
   // Absolutwert mehr – funktioniert dadurch auch bei leiseren Songs/Passagen.
-  const isBeat = bass>0.06 && bassFast>bassAvg*1.22 && sinceBeat>BEAT_COOLDOWN_MS;
+  const isBeat = bass>0.07 && bassFast>bassAvg*1.28 && sinceBeat>BEAT_COOLDOWN_MS;
   if (isBeat) lastBeatTs=now;
   if ((isBeat && gap>PHOTO_MIN_GAP_MS) || gap>PHOTO_MAX_GAP_MS){
     lastPhotoSpawnTs=now;
@@ -332,11 +456,11 @@ function scheduledPhotoCheck(){
 }
 
 function stepStars(){
-  ctx.fillStyle="rgba(3,1,10,0.35)";
+  ctx.fillStyle="rgba(15,2,7,0.35)";
   ctx.fillRect(0,0,W,H);
   const audio=getAudioLevel();
   updateBackgroundColor(audio, performance.now());
-  targetSpeed = slowCount>0 ? baseSpeed*0.22 : baseSpeed*(1+audio.bass*3.4);
+  targetSpeed = slowCount>0 ? baseSpeed*0.22 : baseSpeed*(1+audio.bass*1.2);
   speed += (targetSpeed-speed)*0.045;
   targetZoom += (1-targetZoom)*0.02; // Zoom entspannt sich automatisch wieder auf 1
   zoom += (targetZoom-zoom)*0.08;
@@ -352,7 +476,7 @@ function stepStars(){
     const sx=cx + s.x*k*scaleBase;
     const sy=cy + s.y*k*scaleBase;
     if (sx<-20||sx>W+20||sy<-20||sy>H+20) continue;
-    const twinkle=0.65+0.35*Math.sin(nowSec*s.tf + s.tp);
+    let twinkle=0.75+0.25*Math.sin(nowSec/s.tf*Math.PI*2+s.tp);
     let flareBoost=0;
     if (nowSec>=s.flareAt && nowSec<=s.flareAt+s.flareDur){
       const ft=(nowSec-s.flareAt)/s.flareDur;
@@ -360,12 +484,10 @@ function stepStars(){
     } else if (nowSec>s.flareAt+s.flareDur){
       s.flareAt=nowSec+6+Math.random()*22; s.flareDur=0.4+Math.random()*0.35;
     }
-    const size=Math.max(0.4, (1-s.z)*3.2*twinkle*(0.8+twinkleBoost*0.3) + flareBoost*3.4);
+    const pulseBoost=1+beatPulse*0.35;
+    const size=Math.max(0.4, ((1-s.z)*3.2*twinkle*(0.8+twinkleBoost*0.3) + flareBoost*3.4) * s.sizeFactor * pulseBoost);
     const alpha=Math.min(1, (1-s.z)*1.4*twinkle*(0.75+twinkleBoost*0.35) + flareBoost*0.55);
-    ctx.beginPath();
-    ctx.fillStyle=`rgba(${s.c},${alpha})`;
-    ctx.arc(sx, sy, size, 0, Math.PI*2);
-    ctx.fill();
+    drawHeart(ctx, sx, sy, size, s.c, alpha);
     if (audio.bass>0.55){
       ctx.beginPath();
       ctx.fillStyle=`rgba(${s.c},${alpha*0.18})`;
@@ -388,6 +510,45 @@ function stepStars(){
 let nowSec=0;
 requestAnimationFrame(stepStars);
 
+// ---------- Ambiente Herzen: unabhängig vom Takt, steigen leise & stetig auf ----------
+const ambientLayer=document.getElementById("ambientLayer");
+const AMBIENT_HEARTS=["💗","💕","💖","💓","♡"];
+function spawnAmbientHeart(){
+  const el=document.createElement("div");
+  el.className="ambient-heart";
+  el.textContent=AMBIENT_HEARTS[Math.floor(Math.random()*AMBIENT_HEARTS.length)];
+  // Extreme Größenvarianz auch hier: meist zierlich, ab und zu richtig groß.
+  const sizeRoll=Math.random();
+  const baseSize = sizeRoll<0.5 ? 8+Math.random()*10 : sizeRoll<0.82 ? 18+Math.random()*16 : 38+Math.random()*30;
+  const startX=Math.random()*window.innerWidth;
+  el.style.left=startX+"px";
+  el.style.top=(window.innerHeight+30)+"px";
+  el.style.fontSize=baseSize+"px";
+  el.style.color=Math.random()>0.5?"#ff8fb3":"#ffc27a";
+  ambientLayer.appendChild(el);
+  const dur=9000+Math.random()*7000, drift=Math.random()*80-40, sway=10+Math.random()*16;
+  const maxAlpha=(baseSize>34 ? 0.22 : 0.16)+Math.random()*0.18;
+  let start=null;
+  function anim(ts){
+    if (!start) start=ts;
+    const t=(ts-start)/dur;
+    if (t>=1){ el.remove(); return; }
+    const rise=-(window.innerHeight+80)*t;
+    const wave=Math.sin(t*Math.PI*2.4)*sway;
+    const rot=Math.sin(t*Math.PI*1.8)*10;
+    const pulse=1+beatPulse*0.4; // schwebt mit, wächst aber kurz mit jedem Takt
+    el.style.transform=`translate(${(drift*t+wave).toFixed(1)}px, ${rise.toFixed(1)}px) rotate(${rot.toFixed(1)}deg) scale(${pulse.toFixed(2)})`;
+    el.style.opacity = t<0.12 ? (maxAlpha*(t/0.12)).toFixed(2) : (t>0.85 ? (maxAlpha*((1-t)/0.15)).toFixed(2) : maxAlpha.toFixed(2));
+    requestAnimationFrame(anim);
+  }
+  requestAnimationFrame(anim);
+}
+function ambientLoop(){
+  spawnAmbientHeart();
+  setTimeout(ambientLoop, 1800+Math.random()*2200);
+}
+ambientLoop();
+
 // leichtes Zoomen per Pinch/Wheel (optional – nicht nötig, aber möglich)
 let pinchDist=null;
 window.addEventListener("touchmove",(e)=>{
@@ -403,172 +564,31 @@ window.addEventListener("wheel",(e)=>{
   targetZoom=Math.min(2.4, Math.max(0.5, targetZoom - e.deltaY*0.0006));
 },{passive:true});
 
-// ---------- Start ----------
-document.getElementById("startBtn").onclick=async ()=>{
-  const btn=document.getElementById("startBtn");
-  btn.disabled=true;
-  const originalLabel=btn.textContent;
-  btn.textContent="✦ Analysiere Musik …";
-  await analyzeAllTracks();
-  btn.textContent=originalLabel;
-  btn.disabled=false;
-
-  flying=true;
-  document.getElementById("startScreen").classList.add("hidden");
-  document.getElementById("controls").classList.add("show");
-  document.getElementById("hint").classList.add("show");
-  setTimeout(()=>document.getElementById("hint").classList.remove("show"), 6000);
-  lastPhotoSpawnTs=performance.now()-(PHOTO_MAX_GAP_MS-2000); // erstes Foto nach ca. 2s
-  startPlaylist();
-};
-
-// ---------- Fotos (per Ordner-Auswahl direkt vom Gerät geladen) ----------
-let photos=[];
-
-function getDominantColor(dataUrl){
-  return new Promise((resolve)=>{
-    const img=new Image();
-    img.onload=()=>{
-      const c=document.createElement("canvas"); c.width=20; c.height=20;
-      const cx2=c.getContext("2d"); cx2.drawImage(img,0,0,20,20);
-      let r=0,g=0,b=0,n=0;
-      try{
-        const data=cx2.getImageData(0,0,20,20).data;
-        for (let i=0;i<data.length;i+=4){ r+=data[i]; g+=data[i+1]; b+=data[i+2]; n++; }
-      }catch(e){ resolve("168,85,247"); return; }
-      resolve(Math.round(r/n)+","+Math.round(g/n)+","+Math.round(b/n));
-    };
-    img.onerror=()=>resolve("168,85,247");
-    img.src=dataUrl;
-  });
-}
-
-const IMAGE_EXT_RE=/\.(jpe?g|png|gif|webp)$/i;
-const folderBtn=document.getElementById("folderBtn");
-const folderInput=document.getElementById("folderInput");
-const folderHint=document.getElementById("folderHint");
-const startBtnEl=document.getElementById("startBtn");
-
-folderBtn.onclick=()=>folderInput.click();
-
-folderInput.addEventListener("change", async (e)=>{
-  const files=Array.from(e.target.files).filter(f=>IMAGE_EXT_RE.test(f.name));
-  if (!files.length){ showToast("Keine Bilder in diesem Ordner gefunden"); return; }
-  folderHint.textContent="Fotos werden geladen …";
-  photos=[];
-  for (const file of files){
-    const url=URL.createObjectURL(file);
-    const color=await getDominantColor(url);
-    photos.push({src:url, color});
+// ---------- Erzeugt eine ganze "Szene": ein bis drei Fotos, die dezent und leicht
+// versetzt hereinkommen. Zählt nach außen als EIN Foto-Ereignis (ein Gap-Takt). ----------
+// "Kartenstapel"-Auswahl statt reinem Zufall: garantiert, dass wirklich JEDES
+// Foto einmal drankommt, bevor irgendeins sich wiederholt (bei 99 Fotos sonst
+// hätten manche nie gezeigt werden können, andere x-mal hintereinander).
+let photoDeck=[];
+function nextPhotoIndex(excludeSet){
+  if (!photoDeck.length){ photoDeck=shuffle(photos.map((_,i)=>i)); }
+  for (let i=0;i<photoDeck.length;i++){
+    if (!excludeSet.has(photoDeck[i])){
+      const idx=photoDeck[i];
+      photoDeck.splice(i,1);
+      return idx;
+    }
   }
-  folderBtn.classList.add("chosen");
-  folderBtn.textContent="📁 "+photos.length+" Fotos ausgewählt";
-  folderHint.textContent=photos.length+" Fotos geladen ✓";
-  folderHint.classList.add("ready");
-  startBtnEl.disabled=false;
-  showToast(photos.length+" Fotos geladen");
-});
-
-const PHOTO_SIDE_MARGIN=12;   // 10-15px Rand links/rechts
-const PHOTO_TOPBOTTOM_MARGIN=40; // ca. 40px Rand oben/unten
-
-// Dezente Effekte fürs Auf- und Zuklappen – ruhige, kleine Bewegungen statt
-// wilder Drehungen/Sprünge (das hatte vorher die "Glitches" verursacht).
-const PHOTO_EFFECTS=["fadeScale","driftUp","driftDown","driftLeft","driftRight","softBlur"];
-let lastEffect=null;
-function pickEffect(){
-  let e;
-  do{ e=PHOTO_EFFECTS[Math.floor(Math.random()*PHOTO_EFFECTS.length)]; } while (e===lastEffect);
-  lastEffect=e;
-  return e;
-}
-function easeOutCubic(t){ return 1-Math.pow(1-t,3); }
-function weightedPick(pairs){
-  const r=Math.random(); let acc=0;
-  for (const [val,w] of pairs){ acc+=w; if (r<=acc) return val; }
-  return pairs[pairs.length-1][0];
-}
-// Setzt Transform/Filter für die Auf- bzw. Zuklapp-Phase je nach gewähltem Effekt.
-// Alle Effekte bleiben bewusst dezent: kleine Distanzen, sanftes Easing.
-function applyEffectPhase(effect, el, phase, tRaw){
-  const t=Math.max(0, Math.min(1, tRaw));
-  const e=easeOutCubic(t);
-  el.style.filter="";
-  switch(effect){
-    case "driftUp":
-      if (phase==="in"){ el.style.opacity=t; el.style.transform=`translateY(${(1-e)*22}px) scale(${0.95+0.05*e})`; }
-      else { el.style.opacity=1-t; el.style.transform=`translateY(${-t*14}px) scale(${1-t*0.04})`; }
-      break;
-    case "driftDown":
-      if (phase==="in"){ el.style.opacity=t; el.style.transform=`translateY(${-(1-e)*22}px) scale(${0.95+0.05*e})`; }
-      else { el.style.opacity=1-t; el.style.transform=`translateY(${t*14}px) scale(${1-t*0.04})`; }
-      break;
-    case "driftLeft":
-      if (phase==="in"){ el.style.opacity=t; el.style.transform=`translateX(${(1-e)*28}px) scale(${0.95+0.05*e})`; }
-      else { el.style.opacity=1-t; el.style.transform=`translateX(${-t*18}px) scale(${1-t*0.04})`; }
-      break;
-    case "driftRight":
-      if (phase==="in"){ el.style.opacity=t; el.style.transform=`translateX(${-(1-e)*28}px) scale(${0.95+0.05*e})`; }
-      else { el.style.opacity=1-t; el.style.transform=`translateX(${t*18}px) scale(${1-t*0.04})`; }
-      break;
-    case "softBlur":
-      if (phase==="in"){ el.style.opacity=t; el.style.transform=`scale(${0.96+0.04*e})`; el.style.filter=`blur(${(1-e)*7}px)`; }
-      else { el.style.opacity=1-t; el.style.transform=`scale(${1+t*0.03})`; el.style.filter=`blur(${t*5}px)`; }
-      break;
-    default: // "fadeScale"
-      if (phase==="in"){ el.style.opacity=t; el.style.transform=`scale(${0.93+0.07*e})`; }
-      else { el.style.opacity=1-t; el.style.transform=`scale(${1+t*0.03})`; }
-  }
+  return photoDeck.pop(); // Notfall (mehr rects als restliche Fotos im Stapel)
 }
 
-// ---------- Layouts: mal ein großes Foto, mal zwei oder drei gleichzeitig ----------
-function pickLayout(){
-  return weightedPick([["solo",0.55],["duo",0.28],["trio",0.17]]);
-}
-function computeLayoutRects(layout){
-  const availW=W-PHOTO_SIDE_MARGIN*2, availH=H-PHOTO_TOPBOTTOM_MARGIN*2;
-  if (layout==="duo"){
-    const w=availW*0.46, h=availH*0.48;
-    const gap=availW*0.05;
-    const totalW=w*2+gap;
-    const startX=PHOTO_SIDE_MARGIN+(availW-totalW)/2;
-    const midY=PHOTO_TOPBOTTOM_MARGIN+(availH-h)/2;
-    return [
-      {x:startX, y:midY-availH*0.05, w, h},
-      {x:startX+w+gap, y:midY+availH*0.05, w, h}
-    ];
-  }
-  if (layout==="trio"){
-    const wBig=availW*0.52, hBig=availH*0.44;
-    const wSmall=availW*0.34, hSmall=availH*0.28;
-    const cx0=PHOTO_SIDE_MARGIN+availW/2;
-    return [
-      {x:cx0-wBig/2, y:PHOTO_TOPBOTTOM_MARGIN, w:wBig, h:hBig},
-      {x:PHOTO_SIDE_MARGIN, y:PHOTO_TOPBOTTOM_MARGIN+availH-hSmall, w:wSmall, h:hSmall},
-      {x:PHOTO_SIDE_MARGIN+availW-wSmall, y:PHOTO_TOPBOTTOM_MARGIN+availH-hSmall*1.15, w:wSmall, h:hSmall}
-    ];
-  }
-  // solo: meistens groß, ab und zu bewusst kleiner gehalten
-  const sizeVariant=weightedPick([["large",0.55],["medium",0.3],["small",0.15]]);
-  let w,h;
-  if (sizeVariant==="large"){ w=availW; h=availH; }
-  else if (sizeVariant==="medium"){ w=availW*0.66; h=availH*0.6; }
-  else { w=availW*0.44; h=availH*0.4; }
-  const x=PHOTO_SIDE_MARGIN+(availW-w)/2;
-  const y=PHOTO_TOPBOTTOM_MARGIN+(availH-h)/2;
-  return [{x,y,w,h}];
-}
-
-// Erzeugt eine ganze "Szene": ein bis drei Fotos, die dezent und leicht
-// versetzt hereinkommen. Zählt nach außen als EIN Foto-Ereignis (ein Gap-Takt).
 function spawnMemoryScene(){
   if (!photos.length) return;
   const layout=pickLayout();
   const rects=computeLayoutRects(layout);
   const used=new Set();
   rects.forEach((rect,i)=>{
-    let idx;
-    do{ idx=Math.floor(Math.random()*photos.length); } while (photos.length>rects.length && used.has(idx));
+    const idx=nextPhotoIndex(used);
     used.add(idx);
     const delay=i*180;
     setTimeout(()=>spawnPhotoAt(photos[idx], rect, rects.length), delay);
@@ -587,10 +607,11 @@ function spawnPhotoAt(p, rect, sceneCount){
   document.body.appendChild(el);
 
   const centerX=rect.x+rect.w/2, centerY=rect.y+rect.h/2;
-  const heartCount=sceneCount>1?3:5;
+  const heartCount=5+Math.floor(Math.random()*3); // immer ungefähr sechs (5-7)
   const heartTimers=[];
   for (let i=0;i<heartCount;i++){
-    heartTimers.push(setTimeout(()=>spawnHeart(centerX, centerY), 700+i*(2000/heartCount)+Math.random()*280));
+    const dir=HEART_DIRECTIONS[Math.floor(Math.random()*HEART_DIRECTIONS.length)];
+    heartTimers.push(setTimeout(()=>spawnHeart(centerX, centerY, dir), 700+i*(2400/heartCount)+Math.random()*280));
   }
 
   slowCount++;
@@ -601,13 +622,14 @@ function spawnPhotoAt(p, rect, sceneCount){
     if (!start) start=ts;
     const elapsed=ts-start;
     const glow=6+getAudioLevel().bass*18;
-    el.style.boxShadow=`0 10px 46px rgba(${p.color},0.5), 0 0 ${glow}px rgba(${p.color},0.4)`;
+    el.style.boxShadow=`0 10px 46px rgba(${p.color},0.5), 0 0 ${glow}px rgba(255,93,143,0.4)`;
     if (elapsed<fadeInMs){
       applyEffectPhase(effect, el, "in", elapsed/fadeInMs);
     } else if (elapsed<fadeInMs+holdMs){
       el.style.opacity="1"; el.style.filter="";
       const t=(elapsed-fadeInMs)/holdMs;
-      el.style.transform="scale(1) translateY("+(Math.sin(t*Math.PI*2)*3)+"px)";
+      const beatScale=1+beatPulse*0.035; // Foto atmet spürbar im Takt mit
+      el.style.transform="scale("+beatScale.toFixed(3)+") translateY("+(Math.sin(t*Math.PI*2)*3)+"px)";
     } else if (elapsed<totalMs){
       if (!released){ released=true; slowCount=Math.max(0, slowCount-1); }
       applyEffectPhase(effect, el, "out", (elapsed-fadeInMs-holdMs)/fadeOutMs);
@@ -623,29 +645,43 @@ function spawnPhotoAt(p, rect, sceneCount){
 }
 
 // Sanft schwebende, leicht wiegende Herzen mit dezenter Rotation
-function spawnHeart(cx0, cy0){
-  const HEARTS=["💜","💗","💖","💙","✨"];
+function pickPhotoHeartSize(){
+  // Standardmäßig unterschiedlich groß: meist zierlich, ab und zu deutlich größer.
+  return weightedPick([[13,0.4],[19,0.32],[27,0.18],[38,0.1]]) + Math.random()*6;
+}
+const HEART_DIRECTIONS=["up","upLeft","upRight","left","right"];
+function spawnHeart(cx0, cy0, direction){
+  const HEARTS=["💗","💖","💕","💓","✨"];
+  const dir=direction || HEART_DIRECTIONS[Math.floor(Math.random()*HEART_DIRECTIONS.length)];
   const heart=document.createElement("div");
   heart.className="memory-heart";
   heart.textContent=HEARTS[Math.floor(Math.random()*HEARTS.length)];
   const startX=cx0+(Math.random()*70-35), startY=cy0+(Math.random()*50-25);
-  const fontSize=12+Math.random()*10;
+  const fontSize=pickPhotoHeartSize();
   const rotStart=Math.random()*24-12;
   heart.style.left=startX+"px"; heart.style.top=startY+"px"; heart.style.fontSize=fontSize+"px";
   document.body.appendChild(heart);
-  const dur=2300+Math.random()*1000, drift=Math.random()*40-20, sway=5+Math.random()*7;
+  const dur=2300+Math.random()*1200;
+  // Grundrichtung bestimmt vorwiegende Bewegungsachse, Wellen-Sway kommt weiterhin obendrauf.
+  let riseX=0, riseY=-95;
+  if (dir==="upLeft"){ riseX=-55; riseY=-80; }
+  else if (dir==="upRight"){ riseX=55; riseY=-80; }
+  else if (dir==="left"){ riseX=-90; riseY=-35; }
+  else if (dir==="right"){ riseX=90; riseY=-35; }
+  const sway=5+Math.random()*7;
   let start=null;
   function anim(ts){
     if (!start) start=ts;
     const t=(ts-start)/dur;
     if (t>=1){ heart.remove(); return; }
-    const rise=-95*t;
+    const rise=riseY*t;
+    const driftX=riseX*t;
     const wave=Math.sin(t*Math.PI*2.1)*sway;
     const rot=rotStart+Math.sin(t*Math.PI*1.5)*8;
     const scaleIn=Math.min(1, t/0.18);
     const scaleOut=t>0.8 ? 1-((t-0.8)/0.2)*0.15 : 1;
     const scale=(0.75+0.35*Math.sin(scaleIn*Math.PI/2))*scaleOut;
-    heart.style.transform=`translate(${(drift*t+wave).toFixed(1)}px, ${rise.toFixed(1)}px) rotate(${rot.toFixed(1)}deg) scale(${scale.toFixed(2)})`;
+    heart.style.transform=`translate(${(driftX+wave).toFixed(1)}px, ${rise.toFixed(1)}px) rotate(${rot.toFixed(1)}deg) scale(${scale.toFixed(2)})`;
     heart.style.opacity = t<0.12 ? (t/0.12).toFixed(2) : (t>0.78 ? ((1-t)/0.22).toFixed(2) : "1");
     requestAnimationFrame(anim);
   }
@@ -706,6 +742,174 @@ document.getElementById("playPauseBtn").onclick=()=>{
   if (bgMusic.paused){ bgMusic.play(); document.getElementById("playPauseBtn").textContent="⏸️"; }
   else { bgMusic.pause(); document.getElementById("playPauseBtn").textContent="▶️"; }
 };
+
+// ---------- Start ----------
+document.getElementById("startBtn").onclick=async ()=>{
+  const btn=document.getElementById("startBtn");
+  btn.disabled=true;
+  const originalLabel=btn.textContent;
+  btn.textContent="✦ Analysiere Musik …";
+  await analyzeAllTracks();
+  btn.textContent=originalLabel;
+  btn.disabled=false;
+
+  flying=true;
+  document.getElementById("startScreen").classList.add("hidden");
+  document.getElementById("controls").classList.add("show");
+  hintEl.textContent=LOVE_LINES[0];
+  hintEl.classList.add("show");
+  setTimeout(()=>hintEl.classList.remove("show"), 6000);
+  setInterval(cycleLoveLines, 13000);
+  lastPhotoSpawnTs=performance.now()-(PHOTO_MAX_GAP_MS-2000); // erstes Foto nach ca. 2s
+  startPlaylist();
+};
+
+// ---------- Fotos (per Ordner-Auswahl direkt vom Gerät geladen) ----------
+let photos=[];
+
+function getDominantColor(dataUrl){
+  return new Promise((resolve)=>{
+    const img=new Image();
+    img.onload=()=>{
+      const c=document.createElement("canvas"); c.width=20; c.height=20;
+      const cx2=c.getContext("2d"); cx2.drawImage(img,0,0,20,20);
+      let r=0,g=0,b=0,n=0;
+      try{
+        const data=cx2.getImageData(0,0,20,20).data;
+        for (let i=0;i<data.length;i+=4){ r+=data[i]; g+=data[i+1]; b+=data[i+2]; n++; }
+      }catch(e){ resolve("255,93,143"); return; }
+      resolve(Math.round(r/n)+","+Math.round(g/n)+","+Math.round(b/n));
+    };
+    img.onerror=()=>resolve("255,93,143");
+    img.src=dataUrl;
+  });
+}
+
+const IMAGE_EXT_RE=/\.(jpe?g|png|gif|webp)$/i;
+const folderBtn=document.getElementById("folderBtn");
+const folderInput=document.getElementById("folderInput");
+const folderHint=document.getElementById("folderHint");
+const startBtnEl=document.getElementById("startBtn");
+
+folderBtn.onclick=()=>folderInput.click();
+
+folderInput.addEventListener("change", async (e)=>{
+  const files=Array.from(e.target.files).filter(f=>IMAGE_EXT_RE.test(f.name));
+  if (!files.length){ showToast("Keine Bilder in diesem Ordner gefunden"); return; }
+  folderHint.textContent="Eure Erinnerungen werden geladen …";
+  photos=[];
+  for (const file of files){
+    const url=URL.createObjectURL(file);
+    const color=await getDominantColor(url);
+    photos.push({src:url, color});
+  }
+  folderBtn.classList.add("chosen");
+  folderBtn.textContent="💌 "+photos.length+" Fotos ausgewählt";
+  folderHint.textContent=photos.length+" Erinnerungen geladen ✓";
+  folderHint.classList.add("ready");
+  startBtnEl.disabled=false;
+  showToast(photos.length+" Erinnerungen geladen");
+});
+
+const PHOTO_SIDE_MARGIN=12;   // 10-15px Rand links/rechts
+const PHOTO_TOPBOTTOM_MARGIN=40; // ca. 40px Rand oben/unten
+
+// Dezente Effekte fürs Auf- und Zuklappen – ruhige, kleine Bewegungen statt
+// wilder Drehungen/Sprünge (das hatte vorher die "Glitches" verursacht).
+const PHOTO_EFFECTS=["fadeScale","driftUp","driftDown","driftLeft","driftRight","softBlur","zoomPunch","tiltIn"];
+let lastEffect=null;
+function pickEffect(){
+  let e;
+  do{ e=PHOTO_EFFECTS[Math.floor(Math.random()*PHOTO_EFFECTS.length)]; } while (e===lastEffect);
+  lastEffect=e;
+  return e;
+}
+function easeOutCubic(t){ return 1-Math.pow(1-t,3); }
+function weightedPick(pairs){
+  const r=Math.random(); let acc=0;
+  for (const [val,w] of pairs){ acc+=w; if (r<=acc) return val; }
+  return pairs[pairs.length-1][0];
+}
+// Setzt Transform/Filter für die Auf- bzw. Zuklapp-Phase je nach gewähltem Effekt.
+// Alle Effekte bleiben bewusst dezent: kleine Distanzen, sanftes Easing.
+function applyEffectPhase(effect, el, phase, tRaw){
+  const t=Math.max(0, Math.min(1, tRaw));
+  const e=easeOutCubic(t);
+  el.style.filter="";
+  switch(effect){
+    case "driftUp":
+      if (phase==="in"){ el.style.opacity=t; el.style.transform=`translateY(${(1-e)*22}px) scale(${0.95+0.05*e})`; }
+      else { el.style.opacity=1-t; el.style.transform=`translateY(${-t*14}px) scale(${1-t*0.04})`; }
+      break;
+    case "driftDown":
+      if (phase==="in"){ el.style.opacity=t; el.style.transform=`translateY(${-(1-e)*22}px) scale(${0.95+0.05*e})`; }
+      else { el.style.opacity=1-t; el.style.transform=`translateY(${t*14}px) scale(${1-t*0.04})`; }
+      break;
+    case "driftLeft":
+      if (phase==="in"){ el.style.opacity=t; el.style.transform=`translateX(${(1-e)*28}px) scale(${0.95+0.05*e})`; }
+      else { el.style.opacity=1-t; el.style.transform=`translateX(${-t*18}px) scale(${1-t*0.04})`; }
+      break;
+    case "driftRight":
+      if (phase==="in"){ el.style.opacity=t; el.style.transform=`translateX(${-(1-e)*28}px) scale(${0.95+0.05*e})`; }
+      else { el.style.opacity=1-t; el.style.transform=`translateX(${t*18}px) scale(${1-t*0.04})`; }
+      break;
+    case "softBlur":
+      if (phase==="in"){ el.style.opacity=t; el.style.transform=`scale(${0.96+0.04*e})`; el.style.filter=`blur(${(1-e)*7}px)`; }
+      else { el.style.opacity=1-t; el.style.transform=`scale(${1+t*0.03})`; el.style.filter=`blur(${t*5}px)`; }
+      break;
+    case "zoomPunch":
+      // dramatischer: kommt sichtbar klein hereingeschossen und schnappt kurz über 1 ein
+      if (phase==="in"){ el.style.opacity=t; const overshoot=1+Math.sin(e*Math.PI)*0.06; el.style.transform=`scale(${(0.55+0.45*e)*overshoot})`; }
+      else { el.style.opacity=1-t; el.style.transform=`scale(${1+t*0.08})`; }
+      break;
+    case "tiltIn":
+      // sanftes Kippen aus der Ecke, wie ein Polaroid, das man hinlegt
+      if (phase==="in"){ el.style.opacity=t; el.style.transform=`rotate(${(1-e)*7}deg) scale(${0.94+0.06*e})`; }
+      else { el.style.opacity=1-t; el.style.transform=`rotate(${-t*5}deg) scale(${1-t*0.03})`; }
+      break;
+    default: // "fadeScale"
+      if (phase==="in"){ el.style.opacity=t; el.style.transform=`scale(${0.93+0.07*e})`; }
+      else { el.style.opacity=1-t; el.style.transform=`scale(${1+t*0.03})`; }
+  }
+}
+
+// ---------- Layouts: mal ein großes Foto, mal zwei oder drei gleichzeitig ----------
+function pickLayout(){
+  return weightedPick([["solo",0.55],["duo",0.28],["trio",0.17]]);
+}
+function computeLayoutRects(layout){
+  const availW=W-PHOTO_SIDE_MARGIN*2, availH=H-PHOTO_TOPBOTTOM_MARGIN*2;
+  if (layout==="duo"){
+    const w=availW*0.46, h=availH*0.48;
+    const gap=availW*0.05;
+    const totalW=w*2+gap;
+    const startX=PHOTO_SIDE_MARGIN+(availW-totalW)/2;
+    const midY=PHOTO_TOPBOTTOM_MARGIN+(availH-h)/2;
+    return [
+      {x:startX, y:midY-availH*0.05, w, h},
+      {x:startX+w+gap, y:midY+availH*0.05, w, h}
+    ];
+  }
+  if (layout==="trio"){
+    const wBig=availW*0.52, hBig=availH*0.44;
+    const wSmall=availW*0.34, hSmall=availH*0.28;
+    const cx0=PHOTO_SIDE_MARGIN+availW/2;
+    return [
+      {x:cx0-wBig/2, y:PHOTO_TOPBOTTOM_MARGIN, w:wBig, h:hBig},
+      {x:PHOTO_SIDE_MARGIN, y:PHOTO_TOPBOTTOM_MARGIN+availH-hSmall, w:wSmall, h:hSmall},
+      {x:PHOTO_SIDE_MARGIN+availW-wSmall, y:PHOTO_TOPBOTTOM_MARGIN+availH-hSmall*1.15, w:wSmall, h:hSmall}
+    ];
+  }
+  // solo: meistens groß, ab und zu bewusst kleiner gehalten
+  const sizeVariant=weightedPick([["large",0.55],["medium",0.3],["small",0.15]]);
+  let w,h;
+  if (sizeVariant==="large"){ w=availW; h=availH; }
+  else if (sizeVariant==="medium"){ w=availW*0.66; h=availH*0.6; }
+  else { w=availW*0.44; h=availH*0.4; }
+  const x=PHOTO_SIDE_MARGIN+(availW-w)/2;
+  const y=PHOTO_TOPBOTTOM_MARGIN+(availH-h)/2;
+  return [{x,y,w,h}];
+}
 
 })();
 </script>
