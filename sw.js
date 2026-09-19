@@ -2,7 +2,7 @@
    Legt die App-Dateien im Cache ab, damit sie auch offline startet.
    Nach Änderungen an den Dateien die Versionsnummer erhöhen (v3 -> v4),
    dann laden alle Geräte die neue Version. */
-const CACHE = 'tabak-tracker-v3';
+const CACHE = 'tabak-tracker-v4';
 
 // Diese Dateien braucht die App zum Starten.
 const CORE = [

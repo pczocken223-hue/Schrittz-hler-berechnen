@@ -404,6 +404,21 @@ input[type="date"] { display: block; text-align: left; }
 input:focus { border-color: var(--brass); background: rgba(0, 0, 0, 0.36); }
 input::placeholder { color: rgba(152, 162, 140, 0.7); }
 
+.gcig-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.kind-switch { display: flex; gap: 8px; }
+.kind-switch .kind-btn {
+  flex: 1; height: 44px; border-radius: 14px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--muted); font-weight: 700; font-size: 14.5px;
+  font-family: var(--font); cursor: pointer;
+  transition: background .2s ease, color .2s ease, border-color .2s ease;
+}
+.kind-switch .kind-btn.active {
+  color: #20180a; border-color: transparent;
+  background: linear-gradient(135deg, #f3d082, var(--brass-deep));
+}
+.kind-switch.disabled .kind-btn { opacity: .55; pointer-events: none; }
+
 .stepper { display: flex; align-items: stretch; gap: 10px; }
 .stepper button {
   flex: none; width: 56px; min-height: 56px; display: grid; place-items: center; cursor: pointer;

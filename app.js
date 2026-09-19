@@ -1,6 +1,6 @@
 /* Tabak-Tracker – App-Logik
    Alle Daten liegen im localStorage dieses Browsers:
-   „tabakTrackerEntries“ (Käufe) und „tabakTrackerSettings“ (Personen, Hülsen pro Monat). */
+   „tabakTrackerEntries“ (Tabak- und Hülsen-Käufe) und „tabakTrackerSettings“ (Personen, Gramm pro Zigarette). */
 (() => {
   'use strict';
 
@@ -60,14 +60,21 @@
   const isValid = (x) => x && typeof x.date === 'string' && ISO.test(x.date) &&
     typeof x.qty === 'number' && isFinite(x.qty) && x.qty > 0;
 
-  const normalize = (x) => ({
-    id: typeof x.id === 'string' && x.id ? x.id : uid(),
-    date: x.date,
-    dateEnd: typeof x.dateEnd === 'string' && ISO.test(x.dateEnd) ? x.dateEnd : null,
-    qty: x.qty,
-    price: typeof x.price === 'number' && isFinite(x.price) && x.price >= 0 ? x.price : null,
-    note: typeof x.note === 'string' ? x.note : ''
-  });
+  // kind: „tobacco“ (Tabak, in Büchsen, zählt für Zigaretten & Reichweite) oder
+  // „sleeves“ (Hülsen, nur die Ausgaben fließen mit ein, nie in die Zigarettenzahl).
+  const normalize = (x) => {
+    const kind = x.kind === 'sleeves' ? 'sleeves' : 'tobacco';
+    return {
+      id: typeof x.id === 'string' && x.id ? x.id : uid(),
+      date: x.date,
+      kind,
+      dateEnd: kind === 'tobacco' && typeof x.dateEnd === 'string' && ISO.test(x.dateEnd) ? x.dateEnd : null,
+      qty: x.qty,
+      grams: kind === 'tobacco' && typeof x.grams === 'number' && isFinite(x.grams) && x.grams > 0 ? x.grams : null,
+      price: typeof x.price === 'number' && isFinite(x.price) && x.price >= 0 ? x.price : null,
+      note: typeof x.note === 'string' ? x.note : ''
+    };
+  };
 
   const byDate = (a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id);
 
@@ -94,14 +101,22 @@
 
   /* ---------- Einstellungen ---------- */
 
-  // persons: 1–20, sleeves: Hülsen pro Monat (null = nicht eingetragen)
+  // persons: 1–20, gramsCigMin/Max: Gramm Tabak pro Zigarette beim Stopfen (Spanne)
+  const DEFAULT_GCIG_MIN = 0.7;
+  const DEFAULT_GCIG_MAX = 0.9;
   const normSettings = (s) => {
     const p = Math.round(Number(s && s.persons));
-    const raw = s ? s.sleeves : null;
-    const h = Number(raw);
+    const toG = (v, def) => {
+      const n = Number(v);
+      return isFinite(n) && n > 0 ? n : def;
+    };
+    let gMin = toG(s && s.gramsCigMin, DEFAULT_GCIG_MIN);
+    let gMax = toG(s && s.gramsCigMax, DEFAULT_GCIG_MAX);
+    if (gMin > gMax) { const t = gMin; gMin = gMax; gMax = t; }
     return {
       persons: isFinite(p) && p >= 1 ? Math.min(p, 20) : 1,
-      sleeves: raw !== null && raw !== undefined && raw !== '' && isFinite(h) && h >= 0 ? Math.round(h) : null
+      gramsCigMin: Math.round(gMin * 100) / 100,
+      gramsCigMax: Math.round(gMax * 100) / 100
     };
   };
 
@@ -132,34 +147,44 @@
     const now = new Date();
     const curKey = monthKeyOf(now);
     const prevKey = monthKeyOf(new Date(now.getFullYear(), now.getMonth() - 1, 1));
-    const qtyOf = (key) => entries.filter((e) => monthKey(e.date) === key).reduce((s, e) => s + e.qty, 0);
 
-    // Ausgaben im laufenden Kalenderjahr
+    // Reichweite, nächster Kauf, Verlauf und Zigaretten betreffen nur Tabak-Käufe;
+    // Hülsen-Käufe fließen unten nur in die Ausgaben (cost/yearCost) mit ein.
+    const tobacco = entries.filter((e) => e.kind === 'tobacco');
+    const qtyOf = (key) => tobacco.filter((e) => monthKey(e.date) === key).reduce((s, e) => s + e.qty, 0);
+    const gramsOf = (key) => tobacco
+      .filter((e) => monthKey(e.date) === key && e.grams !== null)
+      .reduce((s, e) => s + e.qty * e.grams, 0);
+    const gramsMissingOf = (key) => tobacco
+      .filter((e) => monthKey(e.date) === key && e.grams === null).length;
+
+    // Ausgaben im laufenden Kalenderjahr (Tabak + Hülsen)
     const year = String(now.getFullYear());
     const yearEntries = entries.filter((e) => e.date.startsWith(year));
     const yearPriced = yearEntries.filter((e) => e.price !== null);
 
     const c = {
-      count: entries.length, today, monthQty: qtyOf(curKey), prevQty: qtyOf(prevKey),
+      count: tobacco.length, today, monthQty: qtyOf(curKey), prevQty: qtyOf(prevKey),
+      monthGrams: gramsOf(curKey), monthGramsMissing: gramsMissingOf(curKey),
       year, yearCount: yearEntries.length, yearPricedCount: yearPriced.length,
       yearCost: yearPriced.reduce((s, e) => s + e.price * e.qty, 0)
     };
-    if (!entries.length) return c;
+    if (!tobacco.length) return c;
 
-    const first = entries[0];
-    const last = entries[entries.length - 1];
-    const total = entries.reduce((s, e) => s + e.qty, 0);
+    const first = tobacco[0];
+    const last = tobacco[tobacco.length - 1];
+    const total = tobacco.reduce((s, e) => s + e.qty, 0);
     const spanMonths = Math.max(daysBetween(first.date, today) / DAYS_PER_MONTH, 1);
 
     // Reichweite pro Büchse: bevorzugt aus Einträgen mit "Aufgebraucht am"
-    const withEnd = entries.filter((e) => e.dateEnd);
+    const withEnd = tobacco.filter((e) => e.dateEnd);
     let daysPerBox = null;
     let dpbSource = 'none';
     if (withEnd.length) {
       const days = withEnd.reduce((s, e) => s + daysBetween(e.date, e.dateEnd), 0);
       const qty = withEnd.reduce((s, e) => s + e.qty, 0);
       if (qty > 0) { daysPerBox = days / qty; dpbSource = 'end'; }
-    } else if (entries.length >= 2) {
+    } else if (tobacco.length >= 2) {
       // Alles außer dem letzten Kauf ist bis zum letzten Kauf verbraucht worden.
       const used = total - last.qty;
       const days = daysBetween(first.date, last.date);
@@ -176,6 +201,7 @@
       next = addDays(last.date, Math.round(daysPerBox * last.qty));
     }
 
+    // Ausgaben im Monatsschnitt: Tabak- UND Hülsen-Käufe mit Preis
     const priced = entries.filter((e) => e.price !== null);
     const cost = priced.reduce((s, e) => s + e.price * e.qty, 0);
 
@@ -266,23 +292,40 @@
     }
   }
 
-  // Zigaretten pro Monat / pro Tag aus den Hülsen pro Monat (eine Hülse = eine Zigarette)
-  function renderCigarettes() {
+  // Zigaretten pro Monat / pro Tag aus der Grammzahl der Tabak-Käufe diesen Monat,
+  // geschätzt über die eingestellte Spanne Gramm pro Zigarette (Stopfen).
+  function renderCigarettes(c) {
     const dash = '–';
-    const month = settings.sleeves;
-    if (!month) {
+    if (!c.monthGrams) {
       setText('s-cig-month', dash);
       setText('s-cig-day', dash);
-      setText('s-cig-sub', 'Trage unter „Einträge & Einstellungen“ ein, wie viele Hülsen du im Monat kaufst.');
+      setText('s-cig-sub', c.monthGramsMissing
+        ? `${c.monthGramsMissing} ${plural(c.monthGramsMissing, 'Kauf', 'Käufe')} diesen Monat ohne Gramm-Angabe. Trage bei einem Tabak-Kauf „Gramm pro Büchse“ ein.`
+        : 'Trage bei einem Tabak-Kauf „Gramm pro Büchse“ ein, dann schätzt die App die Zigaretten.');
       return;
     }
-    const day = month / DAYS_PER_MONTH;
-    setText('s-cig-month', fmtNum(month, 0));
-    setText('s-cig-day', fmtNum(day, 1));
+    const gMin = settings.gramsCigMin;
+    const gMax = settings.gramsCigMax;
+    const cigMonthLo = c.monthGrams / gMax;
+    const cigMonthHi = c.monthGrams / gMin;
+    const cigDayLo = cigMonthLo / DAYS_PER_MONTH;
+    const cigDayHi = cigMonthHi / DAYS_PER_MONTH;
+    const rangeStr = (lo, hi, digits) => (hi - lo < (digits === 0 ? 1 : 0.1)
+      ? fmtNum((lo + hi) / 2, digits)
+      : `${fmtNum(lo, digits)}–${fmtNum(hi, digits)}`);
+
+    setText('s-cig-month', rangeStr(cigMonthLo, cigMonthHi, 0));
+    setText('s-cig-day', rangeStr(cigDayLo, cigDayHi, 1));
+
+    let sub = `geschätzt aus ${fmtNum(c.monthGrams, 0)} g Tabak diesen Monat, ${fmtNum(gMin, 2)}–${fmtNum(gMax, 2)} g pro Zigarette`;
+    if (c.monthGramsMissing) {
+      sub += `; ${c.monthGramsMissing} ${plural(c.monthGramsMissing, 'Kauf', 'Käufe')} ohne Gramm-Angabe nicht mitgerechnet`;
+    }
     const p = settings.persons;
-    setText('s-cig-sub', p > 1
-      ? `Pro Person: ${fmtNum(month / p, 0)} im Monat, ${fmtNum(day / p, 1)} am Tag (${p} Personen)`
-      : '');
+    if (p > 1) {
+      sub += `. Pro Person: ${rangeStr(cigMonthLo / p, cigMonthHi / p, 0)} im Monat`;
+    }
+    setText('s-cig-sub', sub);
   }
 
   function renderStats(c) {
@@ -326,12 +369,13 @@
         : `Noch kein Kauf in ${c.year}.`);
     }
 
-    renderCigarettes();
+    renderCigarettes(c);
   }
 
   function renderChart() {
     const box = $('chart');
-    if (!entries.length) {
+    const tobacco = entries.filter((e) => e.kind === 'tobacco');
+    if (!tobacco.length) {
       box.innerHTML = '<svg viewBox="0 0 360 120"><text class="empty" x="180" y="64">Noch keine Daten für den Verlauf</text></svg>';
       return;
     }
@@ -342,7 +386,7 @@
       months.push({ key: monthKeyOf(d), label: MONTHS_SHORT[d.getMonth()], now: i === 0 });
     }
     months.forEach((m) => {
-      m.sum = entries.filter((e) => monthKey(e.date) === m.key).reduce((s, e) => s + e.qty, 0);
+      m.sum = tobacco.filter((e) => monthKey(e.date) === m.key).reduce((s, e) => s + e.qty, 0);
     });
 
     const W = 360, H = 200, top = 26, bottom = 28;
@@ -376,24 +420,33 @@
   let openEntryId = null;
 
   function rowHtml(e, today) {
+    const isTobacco = e.kind === 'tobacco';
+    const unit = isTobacco ? plural(e.qty, 'Büchse', 'Büchsen') : plural(e.qty, 'Packung', 'Packungen');
     const dur = e.dateEnd ? daysBetween(e.date, e.dateEnd) : null;
     const rel = relDays(daysBetween(today, e.date));
     const isOpen = e.id === openEntryId;
+
+    const meta = [];
+    if (isTobacco) {
+      meta.push(`<div><span>Aufgebraucht am</span><b>${e.dateEnd ? fmtDate(e.dateEnd) : '–'}</b></div>`);
+      meta.push(`<div><span>Dauer</span><b>${dur !== null ? `${dur} ${plural(dur, 'Tag', 'Tage')}` : '–'}</b></div>`);
+      meta.push(`<div><span>Gramm pro Büchse</span><b>${e.grams !== null ? `${fmtNum(e.grams, 0)} g` : '–'}</b></div>`);
+    }
+    meta.push(`<div><span>Preis pro ${isTobacco ? 'Büchse' : 'Packung'}</span><b>${e.price !== null ? fmtEUR(e.price) : '–'}</b></div>`);
+    meta.push(`<div><span>Gesamt</span><b>${e.price !== null ? fmtEUR(e.price * e.qty) : '–'}</b></div>`);
+
     return `<div class="row${isOpen ? ' open' : ''}" data-id="${esc(e.id)}">
       <button type="button" class="row-head" data-act="toggle" aria-expanded="${isOpen}">
         <span class="row-main">
           <span class="row-date">${fmtDate(e.date)}</span>
-          <span class="row-rel">${rel}</span>
+          <span class="row-rel">${rel}${isTobacco ? '' : ' · Hülsen'}</span>
         </span>
-        <span class="row-qty">${fmtNum(e.qty)} ${plural(e.qty, 'Büchse', 'Büchsen')}</span>
+        <span class="row-qty">${fmtNum(e.qty)} ${unit}</span>
         <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
       </button>
       <div class="row-body"${isOpen ? '' : ' hidden'}>
         <div class="entry-meta">
-          <div><span>Aufgebraucht am</span><b>${e.dateEnd ? fmtDate(e.dateEnd) : '–'}</b></div>
-          <div><span>Dauer</span><b>${dur !== null ? `${dur} ${plural(dur, 'Tag', 'Tage')}` : '–'}</b></div>
-          <div><span>Preis pro Büchse</span><b>${e.price !== null ? fmtEUR(e.price) : '–'}</b></div>
-          <div><span>Gesamt</span><b>${e.price !== null ? fmtEUR(e.price * e.qty) : '–'}</b></div>
+          ${meta.join('')}
         </div>
         ${e.note ? `<p class="entry-note">${esc(e.note)}</p>` : ''}
         <div class="entry-actions">
@@ -433,12 +486,18 @@
     }
 
     list.innerHTML = [...groups].map(([year, items]) => {
-      const sum = items.reduce((s, e) => s + e.qty, 0);
+      const tSum = items.filter((e) => e.kind === 'tobacco').reduce((s, e) => s + e.qty, 0);
+      const sCount = items.filter((e) => e.kind === 'sleeves').length;
+      const parts = [
+        `${items.length} ${plural(items.length, 'Eintrag', 'Einträge')}`,
+        `${fmtNum(tSum)} ${plural(tSum, 'Büchse', 'Büchsen')}`
+      ];
+      if (sCount) parts.push(`${sCount} ${plural(sCount, 'Hülsen-Kauf', 'Hülsen-Käufe')}`);
       return `<details class="card year" data-year="${year}"${openYears.has(year) ? ' open' : ''}>
         <summary>
           <div>
             <div class="year-name">${year}</div>
-            <div class="year-sum">${items.length} ${plural(items.length, 'Eintrag', 'Einträge')}, ${fmtNum(sum)} ${plural(sum, 'Büchse', 'Büchsen')}</div>
+            <div class="year-sum">${parts.join(', ')}</div>
           </div>
           <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
         </summary>
@@ -558,29 +617,34 @@
     });
   }
 
-  /* ---------- Einstellungen: Personen und Hülsen ---------- */
+  /* ---------- Einstellungen: Personen und Gramm pro Zigarette ---------- */
 
   const persInput = $('f-persons');
-  const sleeveInput = $('f-sleeves');
+  const gcigMinInput = $('f-gcig-min');
+  const gcigMaxInput = $('f-gcig-max');
 
   function syncSettingsUI() {
     persInput.value = String(settings.persons);
-    sleeveInput.value = settings.sleeves === null ? '' : String(settings.sleeves);
+    gcigMinInput.value = String(settings.gramsCigMin);
+    gcigMaxInput.value = String(settings.gramsCigMax);
   }
 
   function commitSettings() {
     settings = normSettings({
       persons: parseInt(persInput.value, 10),
-      sleeves: sleeveInput.value === '' ? null : parseInt(sleeveInput.value, 10)
+      gramsCigMin: gcigMinInput.value === '' ? null : parseFloat(gcigMinInput.value),
+      gramsCigMax: gcigMaxInput.value === '' ? null : parseFloat(gcigMaxInput.value)
     });
     persistSettings();
-    renderCigarettes();
+    render();
   }
 
   persInput.addEventListener('input', commitSettings);
   persInput.addEventListener('change', () => { commitSettings(); syncSettingsUI(); });
-  sleeveInput.addEventListener('input', commitSettings);
-  sleeveInput.addEventListener('change', () => { commitSettings(); syncSettingsUI(); });
+  gcigMinInput.addEventListener('input', commitSettings);
+  gcigMinInput.addEventListener('change', () => { commitSettings(); syncSettingsUI(); });
+  gcigMaxInput.addEventListener('input', commitSettings);
+  gcigMaxInput.addEventListener('change', () => { commitSettings(); syncSettingsUI(); });
 
   function stepPersons(delta) {
     const cur = parseInt(persInput.value, 10);
@@ -594,45 +658,91 @@
   /* ---------- Eintrag anlegen / bearbeiten ---------- */
 
   let editingId = null;
-  const f = { date: $('f-date'), end: $('f-end'), qty: $('f-qty'), price: $('f-price'), note: $('f-note') };
+  let currentKind = 'tobacco';
+  const f = {
+    date: $('f-date'), end: $('f-end'), qty: $('f-qty'), grams: $('f-grams'),
+    price: $('f-price'), note: $('f-note')
+  };
+  const kindSwitch = $('kindSwitch');
+  const gramsField = $('gramsField');
+  const endField = $('endField');
+  const qtyLabel = $('f-qty-label');
+  const priceLabel = $('f-price-label');
+
+  function setKind(kind) {
+    currentKind = kind;
+    const isTobacco = kind === 'tobacco';
+    kindSwitch.querySelectorAll('.kind-btn').forEach((b) => {
+      const active = b.dataset.kind === kind;
+      b.classList.toggle('active', active);
+      b.setAttribute('aria-pressed', String(active));
+    });
+    gramsField.hidden = !isTobacco;
+    endField.hidden = !isTobacco;
+    qtyLabel.textContent = isTobacco ? 'Anzahl Büchsen' : 'Anzahl Packungen';
+    priceLabel.textContent = isTobacco ? 'Preis pro Büchse in €' : 'Preis pro Packung in €';
+    f.qty.min = isTobacco ? '0.5' : '1';
+    f.qty.step = isTobacco ? '0.5' : '1';
+  }
+
+  kindSwitch.addEventListener('click', (ev) => {
+    const btn = ev.target.closest('.kind-btn');
+    if (!btn || editingId !== null || btn.dataset.kind === currentKind) return;
+    setKind(btn.dataset.kind);
+    f.qty.value = '1';
+    f.grams.value = '';
+    f.end.value = '';
+  });
 
   function openEntry(id) {
     editingId = id || null;
     const e = id ? entries.find((x) => x.id === id) : null;
     setText('entryTitle', e ? 'Eintrag bearbeiten' : 'Neuer Eintrag');
+    setKind(e ? e.kind : 'tobacco');
+    kindSwitch.classList.toggle('disabled', !!e);
     f.date.value = e ? e.date : todayISO();
     f.end.value = e && e.dateEnd ? e.dateEnd : '';
     f.qty.value = e ? e.qty : 1;
+    f.grams.value = e && e.grams !== null ? e.grams : '';
     f.price.value = e && e.price !== null ? e.price : '';
     f.note.value = e ? e.note : '';
     setText('formError', '');
     openDialog($('entryDialog'));
   }
 
-  function stepQty(delta) {
+  function stepQty(sign) {
+    const step = parseFloat(f.qty.step) || 0.5;
+    const min = parseFloat(f.qty.min) || 0.5;
     const cur = parseFloat(f.qty.value);
-    const next = Math.max(0.5, (isFinite(cur) ? cur : 0) + delta);
-    f.qty.value = String(Math.round(next * 2) / 2);
+    const next = Math.max(min, (isFinite(cur) ? cur : 0) + sign * step);
+    f.qty.value = String(Math.round(next / step) * step);
   }
 
-  $('qtyMinus').addEventListener('click', () => stepQty(-0.5));
-  $('qtyPlus').addEventListener('click', () => stepQty(0.5));
+  $('qtyMinus').addEventListener('click', () => stepQty(-1));
+  $('qtyPlus').addEventListener('click', () => stepQty(1));
 
   $('entryForm').addEventListener('submit', (ev) => {
     ev.preventDefault();
+    const kind = currentKind;
     const date = f.date.value;
-    const dateEnd = f.end.value || null;
+    const dateEnd = kind === 'tobacco' ? (f.end.value || null) : null;
     const qty = parseFloat(f.qty.value);
+    const grams = kind === 'tobacco' && f.grams.value !== '' ? parseFloat(f.grams.value) : null;
     const price = f.price.value !== '' ? parseFloat(f.price.value) : null;
     const note = f.note.value.trim();
     const fail = (msg) => setText('formError', msg);
 
     if (!date) return fail('Bitte gib ein Kaufdatum an.');
-    if (!isFinite(qty) || qty <= 0) return fail('Bitte gib eine Anzahl größer als 0 an.');
+    if (!isFinite(qty) || qty <= 0) {
+      return fail(kind === 'tobacco'
+        ? 'Bitte gib eine Anzahl größer als 0 an.'
+        : 'Bitte gib eine Anzahl Packungen größer als 0 an.');
+    }
     if (dateEnd && dateEnd < date) return fail('„Aufgebraucht am“ darf nicht vor dem Kaufdatum liegen.');
+    if (grams !== null && (!isFinite(grams) || grams <= 0)) return fail('Bitte gib eine gültige Grammzahl an.');
     if (price !== null && (!isFinite(price) || price < 0)) return fail('Bitte gib einen gültigen Preis an.');
 
-    const entry = { id: editingId || uid(), date, dateEnd, qty, price, note };
+    const entry = { id: editingId || uid(), date, kind, dateEnd, qty, grams, price, note };
     const wasEdit = editingId !== null;
     if (wasEdit) {
       entries = entries.map((e) => (e.id === editingId ? entry : e));
@@ -707,8 +817,9 @@
     const data = {
       app: 'tabak-tracker',
       version: 2,
-      entries: entries.map(({ date, dateEnd, qty, price, note }) => ({ date, dateEnd, qty, price, note })),
-      settings: { persons: settings.persons, sleeves: settings.sleeves }
+      entries: entries.map(({ date, kind, dateEnd, qty, grams, price, note }) =>
+        ({ date, kind, dateEnd, qty, grams, price, note })),
+      settings: { persons: settings.persons, gramsCigMin: settings.gramsCigMin, gramsCigMax: settings.gramsCigMax }
     };
     const json = JSON.stringify(data, null, 2);
     const name = `tabak-tracker-${todayISO()}.json`;
@@ -773,16 +884,12 @@
         if (importedSettings) { settings = importedSettings; persistSettings(); syncSettingsUI(); }
       } else {
         valid.forEach((v) => {
-          const exists = entries.some((e) => e.date === v.date && e.qty === v.qty &&
-            (e.dateEnd || null) === (v.dateEnd || null) && e.note === v.note);
+          const exists = entries.some((e) => e.date === v.date && e.qty === v.qty && e.kind === v.kind &&
+            (e.dateEnd || null) === (v.dateEnd || null) && (e.grams || null) === (v.grams || null) &&
+            e.note === v.note);
           if (!exists) entries.push(v);
         });
-        // Beim Hinzufügen bleiben deine Einstellungen; nur Leeres wird aus der Sicherung gefüllt.
-        if (importedSettings && settings.sleeves === null && importedSettings.sleeves !== null) {
-          settings.sleeves = importedSettings.sleeves;
-          persistSettings();
-          syncSettingsUI();
-        }
+        // Beim Hinzufügen bleiben deine Einstellungen unverändert.
       }
       entries.sort(byDate);
       if (!persist()) return;

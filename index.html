@@ -167,9 +167,12 @@
           <p class="hint">Bei mehr als einer Person zeigt die Übersicht die Zigaretten zusätzlich pro Person.</p>
         </div>
         <div class="field">
-          <label for="f-sleeves">Hülsen pro Monat</label>
-          <input type="number" id="f-sleeves" min="0" step="1" inputmode="numeric" placeholder="z. B. 300">
-          <p class="hint">Eine Hülse ist eine Zigarette. Daraus rechnet die App die Zigaretten pro Monat und pro Tag aus.</p>
+          <label for="f-gcig-min">Gramm pro Zigarette (zum Stopfen)</label>
+          <div class="gcig-pair">
+            <input type="number" id="f-gcig-min" min="0.1" max="3" step="0.05" inputmode="decimal" placeholder="von, z. B. 0,7">
+            <input type="number" id="f-gcig-max" min="0.1" max="3" step="0.05" inputmode="decimal" placeholder="bis, z. B. 0,9">
+          </div>
+          <p class="hint">Daraus schätzt die App die Zigaretten pro Monat und pro Tag – aus der Grammzahl, die du bei deinen Tabak-Käufen einträgst.</p>
         </div>
       </section>
 
@@ -243,12 +246,19 @@
     </div>
 
     <div class="field">
+      <div class="kind-switch" id="kindSwitch" role="group" aria-label="Art des Eintrags">
+        <button type="button" class="kind-btn active" data-kind="tobacco" aria-pressed="true">Tabak</button>
+        <button type="button" class="kind-btn" data-kind="sleeves" aria-pressed="false">Hülsen</button>
+      </div>
+    </div>
+
+    <div class="field">
       <label for="f-date">Kaufdatum</label>
       <input type="date" id="f-date" required>
     </div>
 
     <div class="field">
-      <label for="f-qty">Anzahl Büchsen</label>
+      <label for="f-qty" id="f-qty-label">Anzahl Büchsen</label>
       <div class="stepper">
         <button type="button" id="qtyMinus" aria-label="Weniger">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>
@@ -260,12 +270,17 @@
       </div>
     </div>
 
-    <div class="field">
-      <label for="f-price">Preis pro Büchse in € <span class="opt">(optional)</span></label>
-      <input type="number" id="f-price" min="0" step="0.01" inputmode="decimal" placeholder="z. B. 12,50">
+    <div class="field" id="gramsField">
+      <label for="f-grams">Gramm pro Büchse <span class="opt">(optional)</span></label>
+      <input type="number" id="f-grams" min="0" step="1" inputmode="decimal" placeholder="z. B. 40">
     </div>
 
     <div class="field">
+      <label for="f-price" id="f-price-label">Preis pro Büchse in € <span class="opt">(optional)</span></label>
+      <input type="number" id="f-price" min="0" step="0.01" inputmode="decimal" placeholder="z. B. 12,50">
+    </div>
+
+    <div class="field" id="endField">
       <label for="f-end">Aufgebraucht am <span class="opt">(optional)</span></label>
       <input type="date" id="f-end">
     </div>
