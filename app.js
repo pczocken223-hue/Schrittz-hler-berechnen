@@ -47,6 +47,7 @@
   const fmtNum = (n, digits = 1) => n.toLocaleString('de-DE', { maximumFractionDigits: digits });
   const fmtEUR = (n) => n.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
   const plural = (n, one, many) => (n === 1 ? one : many);
+  const fmtGrams = (g) => (g >= 1000 ? `${fmtNum(g / 1000, g / 1000 >= 10 ? 1 : 2)} kg` : `${fmtNum(g, 0)} g`);
   const relDays = (n) => {
     if (n === 0) return 'heute';
     if (n === 1) return 'morgen';
@@ -101,22 +102,14 @@
 
   /* ---------- Einstellungen ---------- */
 
-  // persons: 1–20, gramsCigMin/Max: Gramm Tabak pro Zigarette beim Stopfen (Spanne)
-  const DEFAULT_GCIG_MIN = 0.7;
-  const DEFAULT_GCIG_MAX = 0.9;
+  // persons: 1–20, gramsPerCig: Gramm Tabak pro Zigarette beim Stopfen
+  const DEFAULT_GRAMS_PER_CIG = 0.8;
   const normSettings = (s) => {
     const p = Math.round(Number(s && s.persons));
-    const toG = (v, def) => {
-      const n = Number(v);
-      return isFinite(n) && n > 0 ? n : def;
-    };
-    let gMin = toG(s && s.gramsCigMin, DEFAULT_GCIG_MIN);
-    let gMax = toG(s && s.gramsCigMax, DEFAULT_GCIG_MAX);
-    if (gMin > gMax) { const t = gMin; gMin = gMax; gMax = t; }
+    const g = Number(s && s.gramsPerCig);
     return {
       persons: isFinite(p) && p >= 1 ? Math.min(p, 20) : 1,
-      gramsCigMin: Math.round(gMin * 100) / 100,
-      gramsCigMax: Math.round(gMax * 100) / 100
+      gramsPerCig: isFinite(g) && g > 0 ? Math.round(g * 100) / 100 : DEFAULT_GRAMS_PER_CIG
     };
   };
 
@@ -157,6 +150,10 @@
       .reduce((s, e) => s + e.qty * e.grams, 0);
     const gramsMissingOf = (key) => tobacco
       .filter((e) => monthKey(e.date) === key && e.grams === null).length;
+    const totalGrams = tobacco
+      .filter((e) => e.grams !== null)
+      .reduce((s, e) => s + e.qty * e.grams, 0);
+    const totalGramsMissing = tobacco.filter((e) => e.grams === null).length;
 
     // Ausgaben im laufenden Kalenderjahr (Tabak + Hülsen)
     const year = String(now.getFullYear());
@@ -166,6 +163,7 @@
     const c = {
       count: tobacco.length, today, monthQty: qtyOf(curKey), prevQty: qtyOf(prevKey),
       monthGrams: gramsOf(curKey), monthGramsMissing: gramsMissingOf(curKey),
+      totalGrams, totalGramsMissing,
       year, yearCount: yearEntries.length, yearPricedCount: yearPriced.length,
       yearCost: yearPriced.reduce((s, e) => s + e.price * e.qty, 0)
     };
@@ -292,40 +290,38 @@
     }
   }
 
-  // Zigaretten pro Monat / pro Tag aus der Grammzahl der Tabak-Käufe diesen Monat,
-  // geschätzt über die eingestellte Spanne Gramm pro Zigarette (Stopfen).
+  // Zigaretten pro Monat / pro Tag – ganz normal aus der Grammzahl der Tabak-Käufe
+  // diesen Monat, geteilt durch die eingestellten Gramm pro Zigarette (Stopfen).
   function renderCigarettes(c) {
     const dash = '–';
     if (!c.monthGrams) {
       setText('s-cig-month', dash);
       setText('s-cig-day', dash);
-      setText('s-cig-sub', c.monthGramsMissing
-        ? `${c.monthGramsMissing} ${plural(c.monthGramsMissing, 'Kauf', 'Käufe')} diesen Monat ohne Gramm-Angabe. Trage bei einem Tabak-Kauf „Gramm pro Büchse“ ein.`
-        : 'Trage bei einem Tabak-Kauf „Gramm pro Büchse“ ein, dann schätzt die App die Zigaretten.');
+      setText('s-cig-sub', 'Trage bei einem Tabak-Kauf „Gramm pro Büchse“ ein, dann berechnet die App die Zigaretten.');
       return;
     }
-    const gMin = settings.gramsCigMin;
-    const gMax = settings.gramsCigMax;
-    const cigMonthLo = c.monthGrams / gMax;
-    const cigMonthHi = c.monthGrams / gMin;
-    const cigDayLo = cigMonthLo / DAYS_PER_MONTH;
-    const cigDayHi = cigMonthHi / DAYS_PER_MONTH;
-    const rangeStr = (lo, hi, digits) => (hi - lo < (digits === 0 ? 1 : 0.1)
-      ? fmtNum((lo + hi) / 2, digits)
-      : `${fmtNum(lo, digits)}–${fmtNum(hi, digits)}`);
-
-    setText('s-cig-month', rangeStr(cigMonthLo, cigMonthHi, 0));
-    setText('s-cig-day', rangeStr(cigDayLo, cigDayHi, 1));
-
-    let sub = `geschätzt aus ${fmtNum(c.monthGrams, 0)} g Tabak diesen Monat, ${fmtNum(gMin, 2)}–${fmtNum(gMax, 2)} g pro Zigarette`;
-    if (c.monthGramsMissing) {
-      sub += `; ${c.monthGramsMissing} ${plural(c.monthGramsMissing, 'Kauf', 'Käufe')} ohne Gramm-Angabe nicht mitgerechnet`;
-    }
+    const month = c.monthGrams / settings.gramsPerCig;
+    const day = month / DAYS_PER_MONTH;
+    setText('s-cig-month', fmtNum(month, 0));
+    setText('s-cig-day', fmtNum(day, 1));
     const p = settings.persons;
-    if (p > 1) {
-      sub += `. Pro Person: ${rangeStr(cigMonthLo / p, cigMonthHi / p, 0)} im Monat`;
+    setText('s-cig-sub', p > 1
+      ? `Pro Person: ${fmtNum(month / p, 0)} im Monat, ${fmtNum(day / p, 1)} am Tag (${p} Personen)`
+      : '');
+  }
+
+  // Gesamtverbrauch: Summe aller Gramm-Angaben über alle Tabak-Käufe hinweg
+  function renderTotalUsed(c) {
+    const dash = '–';
+    if (!c.totalGrams) {
+      setText('s-totalused', dash);
+      setText('s-totalused-sub', 'Trage bei deinen Tabak-Käufen „Gramm pro Büchse“ ein, dann summiert die App den Verbrauch.');
+      return;
     }
-    setText('s-cig-sub', sub);
+    setText('s-totalused', fmtGrams(c.totalGrams));
+    setText('s-totalused-sub', c.totalGramsMissing
+      ? `${c.totalGramsMissing} ${plural(c.totalGramsMissing, 'Kauf', 'Käufe')} ohne Gramm-Angabe nicht mitgezählt`
+      : 'seit dem ersten Eintrag mit Gramm-Angabe');
   }
 
   function renderStats(c) {
@@ -370,6 +366,7 @@
     }
 
     renderCigarettes(c);
+    renderTotalUsed(c);
   }
 
   function renderChart() {
@@ -620,20 +617,17 @@
   /* ---------- Einstellungen: Personen und Gramm pro Zigarette ---------- */
 
   const persInput = $('f-persons');
-  const gcigMinInput = $('f-gcig-min');
-  const gcigMaxInput = $('f-gcig-max');
+  const gcigInput = $('f-gcig');
 
   function syncSettingsUI() {
     persInput.value = String(settings.persons);
-    if (gcigMinInput) gcigMinInput.value = String(settings.gramsCigMin);
-    if (gcigMaxInput) gcigMaxInput.value = String(settings.gramsCigMax);
+    if (gcigInput) gcigInput.value = String(settings.gramsPerCig);
   }
 
   function commitSettings() {
     settings = normSettings({
       persons: parseInt(persInput.value, 10),
-      gramsCigMin: gcigMinInput && gcigMinInput.value !== '' ? parseFloat(gcigMinInput.value) : null,
-      gramsCigMax: gcigMaxInput && gcigMaxInput.value !== '' ? parseFloat(gcigMaxInput.value) : null
+      gramsPerCig: gcigInput && gcigInput.value !== '' ? parseFloat(gcigInput.value) : null
     });
     persistSettings();
     render();
@@ -641,13 +635,9 @@
 
   persInput.addEventListener('input', commitSettings);
   persInput.addEventListener('change', () => { commitSettings(); syncSettingsUI(); });
-  if (gcigMinInput) {
-    gcigMinInput.addEventListener('input', commitSettings);
-    gcigMinInput.addEventListener('change', () => { commitSettings(); syncSettingsUI(); });
-  }
-  if (gcigMaxInput) {
-    gcigMaxInput.addEventListener('input', commitSettings);
-    gcigMaxInput.addEventListener('change', () => { commitSettings(); syncSettingsUI(); });
+  if (gcigInput) {
+    gcigInput.addEventListener('input', commitSettings);
+    gcigInput.addEventListener('change', () => { commitSettings(); syncSettingsUI(); });
   }
 
   function stepPersons(delta) {
@@ -827,7 +817,7 @@
       version: 2,
       entries: entries.map(({ date, kind, dateEnd, qty, grams, price, note }) =>
         ({ date, kind, dateEnd, qty, grams, price, note })),
-      settings: { persons: settings.persons, gramsCigMin: settings.gramsCigMin, gramsCigMax: settings.gramsCigMax }
+      settings: { persons: settings.persons, gramsPerCig: settings.gramsPerCig }
     };
     const json = JSON.stringify(data, null, 2);
     const name = `tabak-tracker-${todayISO()}.json`;
