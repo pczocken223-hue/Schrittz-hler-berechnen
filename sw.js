@@ -1,8 +1,8 @@
 /* Tabak-Tracker – Service Worker
    Legt die App-Dateien im Cache ab, damit sie auch offline startet.
-   Nach Änderungen an den Dateien die Versionsnummer erhöhen (v2 -> v3),
+   Nach Änderungen an den Dateien die Versionsnummer erhöhen (v3 -> v4),
    dann laden alle Geräte die neue Version. */
-const CACHE = 'tabak-tracker-v2';
+const CACHE = 'tabak-tracker-v3';
 
 // Diese Dateien braucht die App zum Starten.
 const CORE = [
@@ -15,11 +15,11 @@ const CORE = [
 
 // Icons werden mitgelegt, blockieren die Installation aber nicht, falls eines fehlt.
 const ICONS = [
-  './icons/icon-192.png',
-  './icons/icon-512.png',
-  './icons/icon-maskable-512.png',
-  './icons/apple-touch-icon.png',
-  './icons/favicon.png'
+  './icon-192.png',
+  './icon-512.png',
+  './icon-maskable-512.png',
+  './apple-touch-icon.png',
+  './favicon.png'
 ];
 
 self.addEventListener('install', (event) => {
