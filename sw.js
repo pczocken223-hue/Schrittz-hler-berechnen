@@ -1,15 +1,20 @@
 /* Tabak-Tracker – Service Worker
    Legt die App-Dateien im Cache ab, damit sie auch offline startet.
-   Nach Änderungen an den Dateien die Versionsnummer erhöhen (v1 -> v2),
+   Nach Änderungen an den Dateien die Versionsnummer erhöhen (v2 -> v3),
    dann laden alle Geräte die neue Version. */
-const CACHE = 'tabak-tracker-v1';
+const CACHE = 'tabak-tracker-v2';
 
-const ASSETS = [
+// Diese Dateien braucht die App zum Starten.
+const CORE = [
   './',
   './index.html',
   './style.css',
   './app.js',
-  './manifest.json',
+  './manifest.json'
+];
+
+// Icons werden mitgelegt, blockieren die Installation aber nicht, falls eines fehlt.
+const ICONS = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable-512.png',
@@ -19,7 +24,9 @@ const ASSETS = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting())
+    caches.open(CACHE)
+      .then((cache) => cache.addAll(CORE).then(() => Promise.allSettled(ICONS.map((url) => cache.add(url)))))
+      .then(() => self.skipWaiting())
   );
 });
 
@@ -46,7 +53,10 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(() => null);
 
-      if (cached) return cached;
+      if (cached) {
+        event.waitUntil(network);
+        return cached;
+      }
 
       const res = await network;
       if (res) return res;

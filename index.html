@@ -26,127 +26,200 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg>
         Installieren
       </button>
-      <button class="icon-btn" id="settingsBtn" type="button" aria-label="Einstellungen">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>
-      </button>
     </div>
   </header>
 
-  <main>
-
-    <!-- Nächster Kauf: Deckel-Ring -->
-    <section class="card hero" aria-labelledby="heroTitle">
-      <h2 id="heroTitle" class="card-title">Nächster Kauf</h2>
-      <div class="ring">
-        <svg viewBox="0 0 240 240" aria-hidden="true">
-          <defs>
-            <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stop-color="#f3d082"/>
-              <stop offset="1" stop-color="#c98f3c"/>
-            </linearGradient>
-            <linearGradient id="ringGradLate" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stop-color="#f7a26f"/>
-              <stop offset="1" stop-color="#e2603d"/>
-            </linearGradient>
-          </defs>
-          <circle class="ring-rim" cx="120" cy="120" r="84"/>
-          <circle class="ring-track" cx="120" cy="120" r="102" transform="rotate(-90 120 120)"/>
-          <circle class="ring-progress" id="ringProgress" cx="120" cy="120" r="102" transform="rotate(-90 120 120)"/>
-        </svg>
-        <div class="ring-center">
-          <div class="ring-num" id="ringNum">–</div>
-          <div class="ring-unit" id="ringUnit">wird berechnet</div>
-        </div>
-      </div>
-      <p class="hero-sub" id="heroSub"></p>
-    </section>
-
-    <!-- Diesen Monat -->
-    <section class="card month" aria-labelledby="monthTitle">
-      <div class="month-head">
-        <div>
-          <h2 id="monthTitle" class="card-title">Diesen Monat</h2>
-          <p class="muted" id="monthName"></p>
-        </div>
-        <span class="delta" id="monthDelta" hidden></span>
-      </div>
-      <div class="month-value">
-        <span class="big" id="s-month">0</span>
-        <span class="big-unit" id="s-month-unit">Büchsen</span>
-      </div>
-      <div class="pips" id="pips" aria-hidden="true"></div>
-    </section>
-
-    <!-- Kennzahlen -->
-    <section class="card stat">
-      <div class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8l-9-5-9 5v8l9 5 9-5V8z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg></div>
-      <div class="stat-body">
-        <h2 class="lbl">Büchsen insgesamt</h2>
-        <div class="val" id="s-total">–</div>
-        <div class="sub" id="s-total-sub"></div>
-      </div>
-    </section>
-
-    <section class="card stat">
-      <div class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M8 2v4M16 2v4M3 10h18"/></svg></div>
-      <div class="stat-body">
-        <h2 class="lbl">Durchschnitt pro Monat</h2>
-        <div class="val" id="s-avg">–</div>
-        <div class="sub" id="s-avg-sub"></div>
-      </div>
-    </section>
-
-    <section class="card stat">
-      <div class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
-      <div class="stat-body">
-        <h2 class="lbl">Reichweite pro Büchse</h2>
-        <div class="val" id="s-dpb">–</div>
-        <div class="sub" id="s-dpb-sub"></div>
-      </div>
-    </section>
-
-    <section class="card stat">
-      <div class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12l1 13H5L6 7z"/><path d="M9 7a3 3 0 016 0"/></svg></div>
-      <div class="stat-body">
-        <h2 class="lbl">Letzter Kauf</h2>
-        <div class="val" id="s-last">–</div>
-        <div class="sub" id="s-last-sub"></div>
-      </div>
-    </section>
-
-    <section class="card stat">
-      <div class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18M16 14.5h2"/></svg></div>
-      <div class="stat-body">
-        <h2 class="lbl">Ausgaben pro Monat</h2>
-        <div class="val" id="s-costm">–</div>
-        <div class="sub" id="s-costm-sub"></div>
-      </div>
-    </section>
-
-    <section class="card stat">
-      <div class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg></div>
-      <div class="stat-body">
-        <h2 class="lbl">Ausgaben insgesamt</h2>
-        <div class="val" id="s-costt">–</div>
-        <div class="sub" id="s-costt-sub"></div>
-      </div>
-    </section>
-
-    <!-- Verlauf -->
-    <section class="card chart-card" aria-labelledby="chartTitle">
-      <div class="card-head">
-        <h2 id="chartTitle" class="card-title">Verlauf</h2>
-        <span class="muted">letzte 12 Monate</span>
-      </div>
-      <div class="chart" id="chart" role="img" aria-label="Säulendiagramm: Büchsen pro Monat"></div>
-    </section>
-
-    <!-- Einträge -->
-    <div class="section-head">
-      <h2>Alle Einträge</h2>
-      <span class="muted" id="entryCount"></span>
+  <!-- Umschalter zwischen den zwei Bereichen (auch per Wischen) -->
+  <div class="tabs-wrap">
+    <div class="tabs" id="tabs" role="tablist" aria-label="Bereiche" data-active="overview">
+      <span class="tab-thumb" aria-hidden="true"></span>
+      <button class="tab" id="tab-overview" type="button" role="tab" aria-selected="true" aria-controls="page-overview">Übersicht</button>
+      <button class="tab" id="tab-entries" type="button" role="tab" aria-selected="false" aria-controls="page-entries" tabindex="-1">
+        <span class="long">Einträge &amp; Einstellungen</span><span class="short">Einträge</span>
+      </button>
     </div>
-    <div class="entries" id="entryList"></div>
+  </div>
+
+  <main id="pages">
+
+    <!-- ===== Bereich 1: Übersicht ===== -->
+    <div class="page" id="page-overview" role="tabpanel" aria-labelledby="tab-overview">
+
+      <!-- Nächster Kauf: Deckel-Ring -->
+      <section class="card hero" aria-labelledby="heroTitle">
+        <h2 id="heroTitle" class="card-title">Nächster Kauf</h2>
+        <div class="ring">
+          <svg viewBox="0 0 240 240" aria-hidden="true">
+            <defs>
+              <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#f3d082"/>
+                <stop offset="1" stop-color="#c98f3c"/>
+              </linearGradient>
+              <linearGradient id="ringGradLate" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#f7a26f"/>
+                <stop offset="1" stop-color="#e2603d"/>
+              </linearGradient>
+            </defs>
+            <circle class="ring-rim" cx="120" cy="120" r="84"/>
+            <circle class="ring-track" cx="120" cy="120" r="102" transform="rotate(-90 120 120)"/>
+            <circle class="ring-progress" id="ringProgress" cx="120" cy="120" r="102" transform="rotate(-90 120 120)"/>
+          </svg>
+          <div class="ring-center">
+            <div class="ring-num" id="ringNum">–</div>
+            <div class="ring-unit" id="ringUnit">wird berechnet</div>
+          </div>
+        </div>
+        <p class="hero-sub" id="heroSub"></p>
+      </section>
+
+      <!-- Diesen Monat -->
+      <section class="card month" aria-labelledby="monthTitle">
+        <div class="month-head">
+          <div>
+            <h2 id="monthTitle" class="card-title">Diesen Monat</h2>
+            <p class="muted" id="monthName"></p>
+          </div>
+          <span class="delta" id="monthDelta" hidden></span>
+        </div>
+        <div class="month-value">
+          <span class="big" id="s-month">0</span>
+          <span class="big-unit" id="s-month-unit">Büchsen</span>
+        </div>
+        <div class="pips" id="pips" aria-hidden="true"></div>
+      </section>
+
+      <!-- Reichweite pro Büchse -->
+      <section class="card stat">
+        <div class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+        <div class="stat-body">
+          <h2 class="lbl">Reichweite pro Büchse</h2>
+          <div class="val" id="s-dpb">–</div>
+          <div class="sub" id="s-dpb-sub"></div>
+        </div>
+      </section>
+
+      <!-- Ausgaben pro Monat -->
+      <section class="card stat">
+        <div class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18M16 14.5h2"/></svg></div>
+        <div class="stat-body">
+          <h2 class="lbl">Ausgaben pro Monat</h2>
+          <div class="val" id="s-costm">–</div>
+          <div class="sub" id="s-costm-sub"></div>
+        </div>
+      </section>
+
+      <!-- Ausgaben dieses Jahr -->
+      <section class="card stat">
+        <div class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg></div>
+        <div class="stat-body">
+          <h2 class="lbl">Ausgaben dieses Jahr</h2>
+          <div class="val" id="s-costy">–</div>
+          <div class="sub" id="s-costy-sub"></div>
+        </div>
+      </section>
+
+      <!-- Zigaretten pro Monat und pro Tag -->
+      <section class="card stat">
+        <div class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="15" width="20" height="5" rx="1.5"/><path d="M16 15v5M18 4c0 2.2-2.2 2.2-2.2 4.4M21.5 6.5c0 1.6-1.6 1.6-1.6 3.2"/></svg></div>
+        <div class="stat-body">
+          <h2 class="lbl">Zigaretten</h2>
+          <div class="pair">
+            <div>
+              <div class="val" id="s-cig-month">–</div>
+              <div class="sub">pro Monat</div>
+            </div>
+            <div>
+              <div class="val" id="s-cig-day">–</div>
+              <div class="sub">pro Tag</div>
+            </div>
+          </div>
+          <div class="sub" id="s-cig-sub"></div>
+        </div>
+      </section>
+
+      <!-- Verlauf -->
+      <section class="card chart-card" aria-labelledby="chartTitle">
+        <div class="card-head">
+          <h2 id="chartTitle" class="card-title">Verlauf</h2>
+          <span class="muted">letzte 12 Monate</span>
+        </div>
+        <div class="chart" id="chart" role="img" aria-label="Säulendiagramm: Büchsen pro Monat"></div>
+      </section>
+
+    </div>
+
+    <!-- ===== Bereich 2: Einträge & Einstellungen ===== -->
+    <div class="page" id="page-entries" role="tabpanel" aria-labelledby="tab-entries" hidden>
+
+      <div class="section-head first"><h2>Einstellungen</h2></div>
+      <section class="card settings-card">
+        <div class="field">
+          <label for="f-persons">Anzahl Personen</label>
+          <div class="stepper">
+            <button type="button" id="personsMinus" aria-label="Weniger Personen">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>
+            </button>
+            <input type="number" id="f-persons" min="1" max="20" step="1" value="1" inputmode="numeric">
+            <button type="button" id="personsPlus" aria-label="Mehr Personen">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+          </div>
+          <p class="hint">Bei mehr als einer Person zeigt die Übersicht die Zigaretten zusätzlich pro Person.</p>
+        </div>
+        <div class="field">
+          <label for="f-sleeves">Hülsen pro Monat</label>
+          <input type="number" id="f-sleeves" min="0" step="1" inputmode="numeric" placeholder="z. B. 300">
+          <p class="hint">Eine Hülse ist eine Zigarette. Daraus rechnet die App die Zigaretten pro Monat und pro Tag aus.</p>
+        </div>
+      </section>
+
+      <div class="section-head">
+        <h2>Alle Einträge</h2>
+        <span class="muted" id="entryCount"></span>
+      </div>
+      <div class="entries" id="entryList"></div>
+
+      <div class="section-head"><h2>Daten &amp; App</h2></div>
+      <section class="card">
+
+        <section class="setting" id="installSection">
+          <h3>App installieren</h3>
+          <p id="installStatus"></p>
+          <div id="installHelp" class="install-help" hidden></div>
+          <button class="btn primary" type="button" id="installBtn" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg>
+            App installieren
+          </button>
+        </section>
+
+        <section class="setting">
+          <h3>Daten sichern</h3>
+          <p>Deine Einträge und Einstellungen liegen nur in diesem Browser. Speichere eine Sicherung, um sie auf ein anderes Gerät zu übertragen oder bei einem Wechsel nicht zu verlieren.</p>
+          <div class="btn-col">
+            <button class="btn soft" type="button" id="exportBtn">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg>
+              Sicherung speichern
+            </button>
+            <button class="btn soft" type="button" id="importBtn">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3M7 8l5-5 5 5M4 21h16"/></svg>
+              Sicherung laden
+            </button>
+          </div>
+          <input type="file" id="importFile" accept=".json,.txt,application/json,text/plain" hidden>
+          <p class="note-small">Die installierte App hat auf dem iPhone einen eigenen Speicher. Lade deine Sicherung deshalb nach der Installation in der App.</p>
+        </section>
+
+        <section class="setting">
+          <h3>Zurücksetzen</h3>
+          <button class="btn danger" type="button" id="clearBtn">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>
+            Alle Einträge löschen
+          </button>
+        </section>
+
+      </section>
+
+    </div>
 
   </main>
 </div>
@@ -209,54 +282,6 @@
       <button class="btn primary" type="submit" id="saveBtn">Speichern</button>
     </div>
   </form>
-</dialog>
-
-<!-- Einstellungen -->
-<dialog id="settingsDialog" class="sheet-dialog" aria-labelledby="settingsTitle">
-  <div class="sheet">
-    <div class="grabber" aria-hidden="true"></div>
-    <div class="sheet-head">
-      <h2 id="settingsTitle">Einstellungen</h2>
-      <button class="icon-btn small" type="button" data-close aria-label="Schließen">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
-      </button>
-    </div>
-
-    <section class="setting">
-      <h3>App installieren</h3>
-      <p id="installStatus"></p>
-      <div id="installHelp" class="install-help" hidden></div>
-      <button class="btn primary" type="button" id="installBtn" hidden>
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg>
-        App installieren
-      </button>
-    </section>
-
-    <section class="setting">
-      <h3>Daten sichern</h3>
-      <p>Deine Einträge liegen nur in diesem Browser. Speichere eine Sicherung, um sie auf ein anderes Gerät zu übertragen oder bei einem Wechsel nicht zu verlieren.</p>
-      <div class="btn-col">
-        <button class="btn soft" type="button" id="exportBtn">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg>
-          Sicherung speichern
-        </button>
-        <button class="btn soft" type="button" id="importBtn">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3M7 8l5-5 5 5M4 21h16"/></svg>
-          Sicherung laden
-        </button>
-      </div>
-      <input type="file" id="importFile" accept=".json,.txt,application/json,text/plain" hidden>
-      <p class="note-small">Die installierte App hat auf dem iPhone einen eigenen Speicher. Lade deine Sicherung deshalb nach der Installation in der App.</p>
-    </section>
-
-    <section class="setting">
-      <h3>Zurücksetzen</h3>
-      <button class="btn danger" type="button" id="clearBtn">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>
-        Alle Einträge löschen
-      </button>
-    </section>
-  </div>
 </dialog>
 
 <!-- Bestätigung / Auswahl -->

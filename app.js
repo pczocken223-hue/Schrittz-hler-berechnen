@@ -1,12 +1,16 @@
 /* Tabak-Tracker – App-Logik
-   Alle Daten liegen im localStorage dieses Browsers (Schlüssel "tabakTrackerEntries"). */
+   Alle Daten liegen im localStorage dieses Browsers:
+   „tabakTrackerEntries“ (Käufe) und „tabakTrackerSettings“ (Personen, Hülsen pro Monat). */
 (() => {
   'use strict';
 
   const KEY = 'tabakTrackerEntries';
+  const SETTINGS_KEY = 'tabakTrackerSettings';
   const ISO = /^\d{4}-\d{2}-\d{2}$/;
   const MONTHS_SHORT = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
   const RING_C = 2 * Math.PI * 102;
+  const DAYS_PER_MONTH = 30.44;
+  const TABS = ['overview', 'entries'];
 
   const $ = (id) => document.getElementById(id);
 
@@ -88,6 +92,39 @@
     }
   }
 
+  /* ---------- Einstellungen ---------- */
+
+  // persons: 1–20, sleeves: Hülsen pro Monat (null = nicht eingetragen)
+  const normSettings = (s) => {
+    const p = Math.round(Number(s && s.persons));
+    const raw = s ? s.sleeves : null;
+    const h = Number(raw);
+    return {
+      persons: isFinite(p) && p >= 1 ? Math.min(p, 20) : 1,
+      sleeves: raw !== null && raw !== undefined && raw !== '' && isFinite(h) && h >= 0 ? Math.round(h) : null
+    };
+  };
+
+  function loadSettings() {
+    try {
+      return normSettings(JSON.parse(localStorage.getItem(SETTINGS_KEY)));
+    } catch (e) {
+      return normSettings(null);
+    }
+  }
+
+  let settings = loadSettings();
+
+  function persistSettings() {
+    try {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+      return true;
+    } catch (e) {
+      toast('Speichern nicht möglich. Der Browser-Speicher ist voll oder gesperrt.');
+      return false;
+    }
+  }
+
   /* ---------- Kennzahlen ---------- */
 
   function compute() {
@@ -97,13 +134,22 @@
     const prevKey = monthKeyOf(new Date(now.getFullYear(), now.getMonth() - 1, 1));
     const qtyOf = (key) => entries.filter((e) => monthKey(e.date) === key).reduce((s, e) => s + e.qty, 0);
 
-    const c = { count: entries.length, today, monthQty: qtyOf(curKey), prevQty: qtyOf(prevKey) };
+    // Ausgaben im laufenden Kalenderjahr
+    const year = String(now.getFullYear());
+    const yearEntries = entries.filter((e) => e.date.startsWith(year));
+    const yearPriced = yearEntries.filter((e) => e.price !== null);
+
+    const c = {
+      count: entries.length, today, monthQty: qtyOf(curKey), prevQty: qtyOf(prevKey),
+      year, yearCount: yearEntries.length, yearPricedCount: yearPriced.length,
+      yearCost: yearPriced.reduce((s, e) => s + e.price * e.qty, 0)
+    };
     if (!entries.length) return c;
 
     const first = entries[0];
     const last = entries[entries.length - 1];
     const total = entries.reduce((s, e) => s + e.qty, 0);
-    const spanMonths = Math.max(daysBetween(first.date, today) / 30.44, 1);
+    const spanMonths = Math.max(daysBetween(first.date, today) / DAYS_PER_MONTH, 1);
 
     // Reichweite pro Büchse: bevorzugt aus Einträgen mit "Aufgebraucht am"
     const withEnd = entries.filter((e) => e.dateEnd);
@@ -139,7 +185,7 @@
     });
   }
 
-  /* ---------- Darstellung ---------- */
+  /* ---------- Darstellung: Übersicht ---------- */
 
   function renderHero(c) {
     const ring = $('ringProgress');
@@ -220,46 +266,67 @@
     }
   }
 
-  function renderStats(c) {
+  // Zigaretten pro Monat / pro Tag aus den Hülsen pro Monat (eine Hülse = eine Zigarette)
+  function renderCigarettes() {
     const dash = '–';
-    if (!c.count) {
-      ['s-total', 's-avg', 's-dpb', 's-last', 's-costm', 's-costt'].forEach((id) => setText(id, dash));
-      ['s-total-sub', 's-avg-sub', 's-dpb-sub', 's-last-sub', 's-costm-sub', 's-costt-sub'].forEach((id) => setText(id, ''));
+    const month = settings.sleeves;
+    if (!month) {
+      setText('s-cig-month', dash);
+      setText('s-cig-day', dash);
+      setText('s-cig-sub', 'Trage unter „Einträge & Einstellungen“ ein, wie viele Hülsen du im Monat kaufst.');
       return;
     }
+    const day = month / DAYS_PER_MONTH;
+    setText('s-cig-month', fmtNum(month, 0));
+    setText('s-cig-day', fmtNum(day, 1));
+    const p = settings.persons;
+    setText('s-cig-sub', p > 1
+      ? `Pro Person: ${fmtNum(month / p, 0)} im Monat, ${fmtNum(day / p, 1)} am Tag (${p} Personen)`
+      : '');
+  }
 
-    setText('s-total', fmtNum(c.total));
-    setText('s-total-sub', `seit ${fmtDate(c.first.date)}`);
+  function renderStats(c) {
+    const dash = '–';
 
-    setText('s-avg', fmtNum(c.total / c.spanMonths));
-    setText('s-avg-sub', 'Büchsen pro Monat');
-
-    if (c.daysPerBox !== null) {
-      setText('s-dpb', `${fmtNum(c.daysPerBox)} ${plural(c.daysPerBox, 'Tag', 'Tage')}`);
-      setText('s-dpb-sub', c.dpbSource === 'end'
-        ? `aus ${c.withEndCount} ${plural(c.withEndCount, 'Eintrag', 'Einträgen')} mit „Aufgebraucht am“`
-        : 'geschätzt aus den Abständen deiner Käufe');
+    // Reichweite pro Büchse und Ausgaben pro Monat
+    if (!c.count) {
+      ['s-dpb', 's-costm'].forEach((id) => setText(id, dash));
+      ['s-dpb-sub', 's-costm-sub'].forEach((id) => setText(id, ''));
     } else {
-      setText('s-dpb', dash);
-      setText('s-dpb-sub', 'Dafür braucht es mindestens zwei Käufe.');
+      if (c.daysPerBox !== null) {
+        setText('s-dpb', `${fmtNum(c.daysPerBox)} ${plural(c.daysPerBox, 'Tag', 'Tage')}`);
+        setText('s-dpb-sub', c.dpbSource === 'end'
+          ? `aus ${c.withEndCount} ${plural(c.withEndCount, 'Eintrag', 'Einträgen')} mit „Aufgebraucht am“`
+          : 'geschätzt aus den Abständen deiner Käufe');
+      } else {
+        setText('s-dpb', dash);
+        setText('s-dpb-sub', 'Dafür braucht es mindestens zwei Käufe.');
+      }
+
+      if (c.pricedCount) {
+        setText('s-costm', fmtEUR(c.cost / c.spanMonths));
+        setText('s-costm-sub', 'im Monatsschnitt');
+      } else {
+        setText('s-costm', dash);
+        setText('s-costm-sub', 'Trage bei einem Kauf den Preis ein.');
+      }
     }
 
-    setText('s-last', fmtDate(c.last.date));
-    setText('s-last-sub', relDays(daysBetween(c.today, c.last.date)));
-
-    if (c.pricedCount) {
-      setText('s-costm', fmtEUR(c.cost / c.spanMonths));
-      setText('s-costm-sub', 'im Monatsschnitt');
-      setText('s-costt', fmtEUR(c.cost));
-      setText('s-costt-sub', c.pricedCount === c.count
-        ? `seit ${fmtDate(c.first.date)}`
-        : `aus ${c.pricedCount} von ${c.count} Einträgen mit Preis`);
+    // Ausgaben im ganzen (laufenden) Jahr
+    if (c.yearPricedCount) {
+      const missing = c.yearCount - c.yearPricedCount;
+      setText('s-costy', fmtEUR(c.yearCost));
+      setText('s-costy-sub', `Kalenderjahr ${c.year}` + (missing
+        ? `, ${missing} ${plural(missing, 'Eintrag', 'Einträge')} ohne Preis`
+        : ''));
     } else {
-      setText('s-costm', dash);
-      setText('s-costm-sub', 'Trage bei einem Kauf den Preis ein.');
-      setText('s-costt', dash);
-      setText('s-costt-sub', '');
+      setText('s-costy', dash);
+      setText('s-costy-sub', c.yearCount
+        ? `Für ${c.year} ist noch kein Preis eingetragen.`
+        : `Noch kein Kauf in ${c.year}.`);
     }
+
+    renderCigarettes();
   }
 
   function renderChart() {
@@ -302,27 +369,26 @@
     box.innerHTML = svg + '</svg>';
   }
 
-  function renderEntries(c) {
-    const list = $('entryList');
-    setText('entryCount', entries.length ? `${entries.length} ${plural(entries.length, 'Eintrag', 'Einträge')}` : '');
+  /* ---------- Darstellung: Einträge (nach Jahr gruppiert) ---------- */
 
-    if (!entries.length) {
-      list.innerHTML = '<div class="card empty-card"><b>Noch keine Einträge</b>' +
-        '<p>Tippe unten auf „Neuer Eintrag“ und trage deinen ersten Kauf ein.</p></div>';
-      return;
-    }
+  const openYears = new Set();
+  let yearsInitialised = false;
+  let openEntryId = null;
 
-    list.innerHTML = [...entries].reverse().map((e) => {
-      const dur = e.dateEnd ? daysBetween(e.date, e.dateEnd) : null;
-      const rel = relDays(daysBetween(c.today, e.date));
-      return `<article class="card entry" data-id="${esc(e.id)}">
-        <div class="entry-top">
-          <div>
-            <div class="entry-date">${fmtDate(e.date)}</div>
-            <div class="entry-rel">${rel}</div>
-          </div>
-          <div class="qty-badge"><b>${fmtNum(e.qty)}</b><span>${plural(e.qty, 'Büchse', 'Büchsen')}</span></div>
-        </div>
+  function rowHtml(e, today) {
+    const dur = e.dateEnd ? daysBetween(e.date, e.dateEnd) : null;
+    const rel = relDays(daysBetween(today, e.date));
+    const isOpen = e.id === openEntryId;
+    return `<div class="row${isOpen ? ' open' : ''}" data-id="${esc(e.id)}">
+      <button type="button" class="row-head" data-act="toggle" aria-expanded="${isOpen}">
+        <span class="row-main">
+          <span class="row-date">${fmtDate(e.date)}</span>
+          <span class="row-rel">${rel}</span>
+        </span>
+        <span class="row-qty">${fmtNum(e.qty)} ${plural(e.qty, 'Büchse', 'Büchsen')}</span>
+        <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="row-body"${isOpen ? '' : ' hidden'}>
         <div class="entry-meta">
           <div><span>Aufgebraucht am</span><b>${e.dateEnd ? fmtDate(e.dateEnd) : '–'}</b></div>
           <div><span>Dauer</span><b>${dur !== null ? `${dur} ${plural(dur, 'Tag', 'Tage')}` : '–'}</b></div>
@@ -338,7 +404,46 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>Löschen
           </button>
         </div>
-      </article>`;
+      </div>
+    </div>`;
+  }
+
+  function renderEntries(c) {
+    const list = $('entryList');
+    setText('entryCount', entries.length ? `${entries.length} ${plural(entries.length, 'Eintrag', 'Einträge')}` : '');
+
+    if (!entries.length) {
+      list.innerHTML = '<div class="card empty-card"><b>Noch keine Einträge</b>' +
+        '<p>Tippe unten auf „Neuer Eintrag“ und trage deinen ersten Kauf ein.</p></div>';
+      return;
+    }
+
+    // Neueste zuerst, gruppiert nach Kaufjahr
+    const groups = new Map();
+    [...entries].reverse().forEach((e) => {
+      const y = e.date.slice(0, 4);
+      if (!groups.has(y)) groups.set(y, []);
+      groups.get(y).push(e);
+    });
+
+    // Beim ersten Anzeigen ist nur das neueste Jahr aufgeklappt
+    if (!yearsInitialised) {
+      openYears.add(groups.keys().next().value);
+      yearsInitialised = true;
+    }
+
+    list.innerHTML = [...groups].map(([year, items]) => {
+      const sum = items.reduce((s, e) => s + e.qty, 0);
+      return `<details class="card year" data-year="${year}"${openYears.has(year) ? ' open' : ''}>
+        <summary>
+          <div>
+            <div class="year-name">${year}</div>
+            <div class="year-sum">${items.length} ${plural(items.length, 'Eintrag', 'Einträge')}, ${fmtNum(sum)} ${plural(sum, 'Büchse', 'Büchsen')}</div>
+          </div>
+          <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        </summary>
+        <div class="rows">${items.map((e) => rowHtml(e, c.today)).join('')}</div>
+      </details>`;
     }).join('');
   }
 
@@ -350,6 +455,60 @@
     renderChart();
     renderEntries(c);
   }
+
+  /* ---------- Bereiche: Umschalten und Wischen ---------- */
+
+  let activeTab = 'overview';
+
+  function setTab(name, opts = {}) {
+    if (name === activeTab || !TABS.includes(name)) return;
+    const from = activeTab;
+    activeTab = name;
+    $('tabs').dataset.active = name;
+    TABS.forEach((t) => {
+      const selected = t === name;
+      const tab = $(`tab-${t}`);
+      const page = $(`page-${t}`);
+      tab.setAttribute('aria-selected', String(selected));
+      tab.tabIndex = selected ? 0 : -1;
+      page.hidden = !selected;
+      page.classList.remove('enter-right', 'enter-left');
+      if (selected && from !== name) {
+        void page.offsetWidth; // Animation neu starten
+        page.classList.add(name === 'entries' ? 'enter-right' : 'enter-left');
+      }
+    });
+    window.scrollTo(0, 0);
+    if (opts.focus) $(`tab-${name}`).focus();
+  }
+
+  TABS.forEach((t) => $(`tab-${t}`).addEventListener('click', () => setTab(t)));
+
+  $('tabs').addEventListener('keydown', (ev) => {
+    if (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight') return;
+    ev.preventDefault();
+    setTab(ev.key === 'ArrowRight' ? 'entries' : 'overview', { focus: true });
+  });
+
+  // Wischen: eine deutlich waagerechte Bewegung wechselt in den anderen Bereich.
+  let swipe = null;
+  const pagesEl = $('pages');
+  pagesEl.addEventListener('touchstart', (ev) => {
+    const blocked = ev.touches.length !== 1 || document.querySelector('dialog[open]') ||
+      ev.target.closest('input, textarea, select');
+    if (blocked) { swipe = null; return; }
+    swipe = { x: ev.touches[0].clientX, y: ev.touches[0].clientY };
+  }, { passive: true });
+  pagesEl.addEventListener('touchcancel', () => { swipe = null; }, { passive: true });
+  pagesEl.addEventListener('touchend', (ev) => {
+    if (!swipe) return;
+    const t = ev.changedTouches[0];
+    const dx = t.clientX - swipe.x;
+    const dy = t.clientY - swipe.y;
+    swipe = null;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.6) return;
+    setTab(activeTab === 'overview' ? 'entries' : 'overview');
+  }, { passive: true });
 
   /* ---------- Toast & Dialoge ---------- */
 
@@ -398,6 +557,39 @@
       openDialog(dlg);
     });
   }
+
+  /* ---------- Einstellungen: Personen und Hülsen ---------- */
+
+  const persInput = $('f-persons');
+  const sleeveInput = $('f-sleeves');
+
+  function syncSettingsUI() {
+    persInput.value = String(settings.persons);
+    sleeveInput.value = settings.sleeves === null ? '' : String(settings.sleeves);
+  }
+
+  function commitSettings() {
+    settings = normSettings({
+      persons: parseInt(persInput.value, 10),
+      sleeves: sleeveInput.value === '' ? null : parseInt(sleeveInput.value, 10)
+    });
+    persistSettings();
+    renderCigarettes();
+  }
+
+  persInput.addEventListener('input', commitSettings);
+  persInput.addEventListener('change', () => { commitSettings(); syncSettingsUI(); });
+  sleeveInput.addEventListener('input', commitSettings);
+  sleeveInput.addEventListener('change', () => { commitSettings(); syncSettingsUI(); });
+
+  function stepPersons(delta) {
+    const cur = parseInt(persInput.value, 10);
+    persInput.value = String(Math.max(1, Math.min(20, (isFinite(cur) ? cur : 1) + delta)));
+    commitSettings();
+    syncSettingsUI();
+  }
+  $('personsMinus').addEventListener('click', () => stepPersons(-1));
+  $('personsPlus').addEventListener('click', () => stepPersons(1));
 
   /* ---------- Eintrag anlegen / bearbeiten ---------- */
 
@@ -449,6 +641,8 @@
     }
     entries.sort(byDate);
     if (!persist()) return;
+    // Das Jahr des Eintrags aufklappen, damit man ihn sofort sieht.
+    openYears.add(date.slice(0, 4));
     $('entryDialog').close();
     render();
     toast(wasEdit ? 'Änderungen gespeichert' : 'Eintrag gespeichert');
@@ -456,11 +650,35 @@
 
   $('addBtn').addEventListener('click', () => openEntry(null));
 
+  // Jahre auf- und zuklappen (merkt sich, welche offen sind)
+  $('entryList').addEventListener('toggle', (ev) => {
+    const det = ev.target;
+    if (!det.matches || !det.matches('details.year')) return;
+    if (det.open) openYears.add(det.dataset.year); else openYears.delete(det.dataset.year);
+  }, true);
+
   $('entryList').addEventListener('click', async (ev) => {
     const btn = ev.target.closest('button[data-act]');
     if (!btn) return;
-    const id = btn.closest('.entry').dataset.id;
-    if (btn.dataset.act === 'edit') {
+    const row = btn.closest('.row');
+    const id = row.dataset.id;
+
+    if (btn.dataset.act === 'toggle') {
+      const willOpen = id !== openEntryId;
+      document.querySelectorAll('#entryList .row.open').forEach((r) => {
+        r.classList.remove('open');
+        r.querySelector('.row-body').hidden = true;
+        r.querySelector('.row-head').setAttribute('aria-expanded', 'false');
+      });
+      if (willOpen) {
+        row.classList.add('open');
+        row.querySelector('.row-body').hidden = false;
+        btn.setAttribute('aria-expanded', 'true');
+        openEntryId = id;
+      } else {
+        openEntryId = null;
+      }
+    } else if (btn.dataset.act === 'edit') {
       openEntry(id);
     } else {
       const e = entries.find((x) => x.id === id);
@@ -474,6 +692,7 @@
       });
       if (answer === 'yes') {
         entries = entries.filter((x) => x.id !== id);
+        if (openEntryId === id) openEntryId = null;
         persist();
         render();
         toast('Eintrag gelöscht');
@@ -485,7 +704,12 @@
 
   async function exportEntries() {
     if (!entries.length) { toast('Es gibt noch keine Einträge zum Sichern.'); return; }
-    const data = entries.map(({ date, dateEnd, qty, price, note }) => ({ date, dateEnd, qty, price, note }));
+    const data = {
+      app: 'tabak-tracker',
+      version: 2,
+      entries: entries.map(({ date, dateEnd, qty, price, note }) => ({ date, dateEnd, qty, price, note })),
+      settings: { persons: settings.persons, sleeves: settings.sleeves }
+    };
     const json = JSON.stringify(data, null, 2);
     const name = `tabak-tracker-${todayISO()}.json`;
 
@@ -516,11 +740,21 @@
     reader.onload = async (ev) => {
       let data;
       try { data = JSON.parse(ev.target.result); } catch (e) { data = null; }
-      if (!Array.isArray(data)) {
+
+      // Alte Sicherungen sind eine reine Liste, neue enthalten Einträge und Einstellungen.
+      let list = null;
+      let importedSettings = null;
+      if (Array.isArray(data)) {
+        list = data;
+      } else if (data && Array.isArray(data.entries)) {
+        list = data.entries;
+        if (data.settings) importedSettings = normSettings(data.settings);
+      }
+      if (!list) {
         toast('Das ist keine Sicherung des Tabak-Trackers.');
         return;
       }
-      const valid = data.filter(isValid).map(normalize);
+      const valid = list.filter(isValid).map(normalize);
       if (!valid.length) { toast('Die Datei enthält keine gültigen Einträge.'); return; }
 
       const mode = await choose({
@@ -536,16 +770,22 @@
 
       if (mode === 'replace') {
         entries = valid;
+        if (importedSettings) { settings = importedSettings; persistSettings(); syncSettingsUI(); }
       } else {
         valid.forEach((v) => {
           const exists = entries.some((e) => e.date === v.date && e.qty === v.qty &&
             (e.dateEnd || null) === (v.dateEnd || null) && e.note === v.note);
           if (!exists) entries.push(v);
         });
+        // Beim Hinzufügen bleiben deine Einstellungen; nur Leeres wird aus der Sicherung gefüllt.
+        if (importedSettings && settings.sleeves === null && importedSettings.sleeves !== null) {
+          settings.sleeves = importedSettings.sleeves;
+          persistSettings();
+          syncSettingsUI();
+        }
       }
       entries.sort(byDate);
       if (!persist()) return;
-      $('settingsDialog').close();
       render();
       toast('Sicherung geladen');
     };
@@ -572,14 +812,14 @@
     });
     if (answer === 'yes') {
       entries = [];
+      openEntryId = null;
       persist();
-      $('settingsDialog').close();
       render();
       toast('Alle Einträge gelöscht');
     }
   });
 
-  /* ---------- Einstellungen & Installation ---------- */
+  /* ---------- Installation als App ---------- */
 
   let deferredPrompt = null;
   const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
@@ -615,7 +855,12 @@
   }
 
   async function promptInstall() {
-    if (!deferredPrompt) { openDialog($('settingsDialog')); return; }
+    if (!deferredPrompt) {
+      // Anleitung steht im zweiten Bereich unter „Daten & App“.
+      setTab('entries');
+      $('installSection').scrollIntoView({ block: 'center' });
+      return;
+    }
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
     deferredPrompt = null;
@@ -634,17 +879,25 @@
     toast('App installiert');
   });
 
-  $('settingsBtn').addEventListener('click', () => openDialog($('settingsDialog')));
   $('installChip').addEventListener('click', promptInstall);
   $('installBtn').addEventListener('click', promptInstall);
 
   /* ---------- Start ---------- */
 
+  syncSettingsUI();
   updateInstallUI();
   if (entries.length) persist(); // vergibt IDs für alte Einträge dauerhaft
   render();
 
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    const hadController = !!navigator.serviceWorker.controller;
+    let reloaded = false;
+    // Kommt eine neue Version der App, einmal neu laden (nicht mitten in einem Dialog).
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadController || reloaded || document.querySelector('dialog[open]')) return;
+      reloaded = true;
+      location.reload();
+    });
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('./sw.js').catch(() => { /* offline-Betrieb optional */ });
     });
