@@ -625,15 +625,15 @@
 
   function syncSettingsUI() {
     persInput.value = String(settings.persons);
-    gcigMinInput.value = String(settings.gramsCigMin);
-    gcigMaxInput.value = String(settings.gramsCigMax);
+    if (gcigMinInput) gcigMinInput.value = String(settings.gramsCigMin);
+    if (gcigMaxInput) gcigMaxInput.value = String(settings.gramsCigMax);
   }
 
   function commitSettings() {
     settings = normSettings({
       persons: parseInt(persInput.value, 10),
-      gramsCigMin: gcigMinInput.value === '' ? null : parseFloat(gcigMinInput.value),
-      gramsCigMax: gcigMaxInput.value === '' ? null : parseFloat(gcigMaxInput.value)
+      gramsCigMin: gcigMinInput && gcigMinInput.value !== '' ? parseFloat(gcigMinInput.value) : null,
+      gramsCigMax: gcigMaxInput && gcigMaxInput.value !== '' ? parseFloat(gcigMaxInput.value) : null
     });
     persistSettings();
     render();
@@ -641,10 +641,14 @@
 
   persInput.addEventListener('input', commitSettings);
   persInput.addEventListener('change', () => { commitSettings(); syncSettingsUI(); });
-  gcigMinInput.addEventListener('input', commitSettings);
-  gcigMinInput.addEventListener('change', () => { commitSettings(); syncSettingsUI(); });
-  gcigMaxInput.addEventListener('input', commitSettings);
-  gcigMaxInput.addEventListener('change', () => { commitSettings(); syncSettingsUI(); });
+  if (gcigMinInput) {
+    gcigMinInput.addEventListener('input', commitSettings);
+    gcigMinInput.addEventListener('change', () => { commitSettings(); syncSettingsUI(); });
+  }
+  if (gcigMaxInput) {
+    gcigMaxInput.addEventListener('input', commitSettings);
+    gcigMaxInput.addEventListener('change', () => { commitSettings(); syncSettingsUI(); });
+  }
 
   function stepPersons(delta) {
     const cur = parseInt(persInput.value, 10);
@@ -672,38 +676,42 @@
   function setKind(kind) {
     currentKind = kind;
     const isTobacco = kind === 'tobacco';
-    kindSwitch.querySelectorAll('.kind-btn').forEach((b) => {
-      const active = b.dataset.kind === kind;
-      b.classList.toggle('active', active);
-      b.setAttribute('aria-pressed', String(active));
-    });
-    gramsField.hidden = !isTobacco;
-    endField.hidden = !isTobacco;
-    qtyLabel.textContent = isTobacco ? 'Anzahl Büchsen' : 'Anzahl Packungen';
-    priceLabel.textContent = isTobacco ? 'Preis pro Büchse in €' : 'Preis pro Packung in €';
+    if (kindSwitch) {
+      kindSwitch.querySelectorAll('.kind-btn').forEach((b) => {
+        const active = b.dataset.kind === kind;
+        b.classList.toggle('active', active);
+        b.setAttribute('aria-pressed', String(active));
+      });
+    }
+    if (gramsField) gramsField.hidden = !isTobacco;
+    if (endField) endField.hidden = !isTobacco;
+    if (qtyLabel) qtyLabel.textContent = isTobacco ? 'Anzahl Büchsen' : 'Anzahl Packungen';
+    if (priceLabel) priceLabel.textContent = isTobacco ? 'Preis pro Büchse in €' : 'Preis pro Packung in €';
     f.qty.min = isTobacco ? '0.5' : '1';
     f.qty.step = isTobacco ? '0.5' : '1';
   }
 
-  kindSwitch.addEventListener('click', (ev) => {
-    const btn = ev.target.closest('.kind-btn');
-    if (!btn || editingId !== null || btn.dataset.kind === currentKind) return;
-    setKind(btn.dataset.kind);
-    f.qty.value = '1';
-    f.grams.value = '';
-    f.end.value = '';
-  });
+  if (kindSwitch) {
+    kindSwitch.addEventListener('click', (ev) => {
+      const btn = ev.target.closest('.kind-btn');
+      if (!btn || editingId !== null || btn.dataset.kind === currentKind) return;
+      setKind(btn.dataset.kind);
+      f.qty.value = '1';
+      if (f.grams) f.grams.value = '';
+      if (f.end) f.end.value = '';
+    });
+  }
 
   function openEntry(id) {
     editingId = id || null;
     const e = id ? entries.find((x) => x.id === id) : null;
     setText('entryTitle', e ? 'Eintrag bearbeiten' : 'Neuer Eintrag');
     setKind(e ? e.kind : 'tobacco');
-    kindSwitch.classList.toggle('disabled', !!e);
+    if (kindSwitch) kindSwitch.classList.toggle('disabled', !!e);
     f.date.value = e ? e.date : todayISO();
-    f.end.value = e && e.dateEnd ? e.dateEnd : '';
+    if (f.end) f.end.value = e && e.dateEnd ? e.dateEnd : '';
     f.qty.value = e ? e.qty : 1;
-    f.grams.value = e && e.grams !== null ? e.grams : '';
+    if (f.grams) f.grams.value = e && e.grams !== null ? e.grams : '';
     f.price.value = e && e.price !== null ? e.price : '';
     f.note.value = e ? e.note : '';
     setText('formError', '');
@@ -725,9 +733,9 @@
     ev.preventDefault();
     const kind = currentKind;
     const date = f.date.value;
-    const dateEnd = kind === 'tobacco' ? (f.end.value || null) : null;
+    const dateEnd = kind === 'tobacco' ? ((f.end && f.end.value) || null) : null;
     const qty = parseFloat(f.qty.value);
-    const grams = kind === 'tobacco' && f.grams.value !== '' ? parseFloat(f.grams.value) : null;
+    const grams = kind === 'tobacco' && f.grams && f.grams.value !== '' ? parseFloat(f.grams.value) : null;
     const price = f.price.value !== '' ? parseFloat(f.price.value) : null;
     const note = f.note.value.trim();
     const fail = (msg) => setText('formError', msg);
