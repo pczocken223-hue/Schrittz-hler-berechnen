@@ -1,4 +1,4 @@
-const CACHE = 'listmaster-v1';
+const CACHE = 'listmaster-v2';
 const ASSETS = [
   './index.html',
   './manifest.json',
@@ -23,10 +23,24 @@ self.addEventListener('activate', e => {
   );
 });
 
+// Netzwerk zuerst (so kommen Updates sofort an), Cache als Offline-Fallback.
+// Fremde Adressen (z. B. PeerJS vom CDN) fasst der Service Worker nicht an.
 self.addEventListener('fetch', e => {
+  const req = e.request;
+  if (req.method !== 'GET') return;
+  if (new URL(req.url).origin !== self.location.origin) return;
   e.respondWith(
-    caches.match(e.request).then(cached =>
-      cached || fetch(e.request).catch(() => new Response('Offline', {status: 503}))
+    fetch(req).then(res => {
+      if (res && res.ok && res.status === 200) {
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
+      }
+      return res;
+    }).catch(() =>
+      caches.match(req, { ignoreSearch: true }).then(r =>
+        r || (req.mode === 'navigate' ? caches.match('./index.html') : null) ||
+        new Response('Offline', { status: 503 })
+      )
     )
   );
 });

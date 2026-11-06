@@ -78,11 +78,20 @@ main{padding:4px 12px 120px}
 #toast{position:fixed;left:50%;bottom:92px;transform:translateX(-50%) translateY(8px);display:flex;align-items:center;gap:9px;background:var(--card);border:1px solid var(--stroke2);color:var(--tx);padding:9px 16px;border-radius:8px;font-weight:600;opacity:0;transition:.22s;pointer-events:none;z-index:20;box-shadow:0 6px 18px #0007}
 #toast::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--ok)}
 #toast.show{opacity:1;transform:translateX(-50%)}
+
+.ic{position:relative}
+.dot{position:absolute;top:3px;right:3px;width:7px;height:7px;border:2px solid var(--layer);border-radius:50%;background:#7a7a7a;box-sizing:content-box;display:none}
+.dot.on{display:block;background:var(--ok)}.dot.wait{display:block;background:#ffb347}
+.cstat{display:flex;align-items:center;gap:10px;padding:8px 2px 2px;font-weight:600}
+.cstat i{width:10px;height:10px;border-radius:50%;background:#7a7a7a;flex:none}
+.cstat i.on{background:var(--ok)}.cstat i.wait{background:#ffb347}
+#cc{text-transform:uppercase;letter-spacing:3px;font-weight:600}
+.hint{color:var(--tx3);font-size:13px;margin:14px 2px 0}
 </style>
 </head>
 <body>
 <header>
-  <div class="top"><h1><img src="icon-192.png" alt="">Anime List Master</h1><button id="inst">Installieren</button><button class="ic" id="loadBtn" aria-label="Textdatei laden"><svg width="19" height="19" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5a1 1 0 011-1h3l1.5 1.5H13a1 1 0 011 1V12a1 1 0 01-1 1H3a1 1 0 01-1-1z"/></svg></button></div>
+  <div class="top"><h1><img src="icon-192.png" alt="">Anime List Master</h1><button id="inst">Installieren</button><button class="ic" id="syncBtn" aria-label="Mit anderen Geräten verbinden"><svg width="19" height="19" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13.2 6.5A5.3 5.3 0 003 5.2M2.8 9.5A5.3 5.3 0 0013 10.8M3 2.2v3h3M13 13.8v-3h-3"/></svg><i class="dot" id="dot"></i></button><button class="ic" id="loadBtn" aria-label="Textdatei laden"><svg width="19" height="19" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5a1 1 0 011-1h3l1.5 1.5H13a1 1 0 011 1V12a1 1 0 01-1 1H3a1 1 0 01-1-1z"/></svg></button></div>
   <input id="q" type="search" placeholder="Suchen …" autocomplete="off">
 </header>
 <main id="list"></main>
@@ -106,6 +115,15 @@ main{padding:4px 12px 120px}
   <div class="btns"><button class="btn" data-close>Abbrechen</button><button class="btn main" id="sok">Speichern</button></div>
   <div class="btns" id="sext"><button class="btn bad" id="sdel">Staffel löschen</button></div>
 </div></div>
+<div class="sheet" id="shC"><div class="panel">
+  <div class="cstat"><i id="cdot"></i><span id="ctxt">Nicht verbunden</span></div>
+  <label>Code (auf allen Geräten gleich)</label>
+  <div class="two"><div style="flex:3"><input id="cc" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false"></div><div><button class="btn" id="cnew" style="width:100%;height:100%">Neu</button></div></div>
+  <div class="btns"><button class="btn" id="ccopy">Link kopieren</button><button class="btn main" id="cgo">Verbinden</button></div>
+  <div class="btns" id="cbk" style="display:none"><button class="btn bad" id="crest">Vorherige Liste wiederherstellen</button></div>
+  <p class="hint">Gib auf jedem Gerät denselben Code ein (oder öffne den kopierten Link) und tippe auf „Verbinden“. Die Liste wird live abgeglichen, solange mindestens zwei Geräte gleichzeitig offen sind – sonst beim nächsten Verbinden. Wer den Code kennt, kann deine Liste sehen und ändern.</p>
+  <div class="btns"><button class="btn" data-close>Schließen</button></div>
+</div></div>
 <input type="file" id="file" accept=".txt,text/plain" hidden>
 <div id="toast"></div>
 
@@ -121,7 +139,8 @@ const KEY="alm2_data";
 let data=[], q="", ai=-1, si=-1, st="❌";
 
 function load(){try{data=JSON.parse(localStorage.getItem(KEY))||[]}catch(e){data=[]}}
-function save(){try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){toast("Speichern im Browser fehlgeschlagen")}}
+function persist(){try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){toast("Speichern im Browser fehlgeschlagen")}}
+function save(){persist();pushLocal()}
 function toast(t){const e=$("toast");e.textContent=t;e.classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove("show"),1800)}
 
 
@@ -232,6 +251,213 @@ $("file").onchange=async e=>{
 };
 
 load();render();
+
+/* ===== Live-Abgleich zwischen Geräten (PeerJS, Verbindung per Code) =====
+   Alle Geräte geben denselben Code ein. Das erste Gerät wird "Host", die anderen verbinden sich mit ihm.
+   Fällt der Host weg, übernimmt automatisch ein anderes Gerät. Die Daten bleiben immer auch lokal gespeichert. */
+const CK="alm2_code",AK="alm2_auto",DK="alm2_dirty",BK="alm2_backup";
+const SYNC={peer:null,role:"",host:null,conns:[],gen:0,code:"",on:false,timer:null,stat:"off",msg:"",seq:0,first:false};
+const RANK={"❌":0,"🡇":1,"✔":2};
+const pid=c=>"almaster-"+c.toLowerCase();
+const isDirty=()=>{const v=localStorage.getItem(DK);return v===null?data.length>0:v==="1"};
+const setDirty=b=>{try{localStorage.setItem(DK,b?"1":"0")}catch(e){}};
+const send=(c,m)=>{try{if(c&&c.open)c.send(m)}catch(e){}};
+const newCode=()=>{const A="ABCDEFGHJKLMNPQRSTUVWXYZ23456789",r=crypto.getRandomValues(new Uint8Array(8));return[...r].map(x=>A[x%A.length]).join("")};
+const codeVal=()=>$("cc").value.toUpperCase().replace(/[^A-Z0-9]/g,"");
+
+function clean(d){
+  if(!Array.isArray(d))return[];
+  return d.filter(a=>a&&typeof a.n==="string").slice(0,5000).map(a=>({
+    n:a.n.slice(0,300),l:typeof a.l==="string"?a.l.slice(0,500):"",
+    seasons:(Array.isArray(a.seasons)?a.seasons:[]).slice(0,500).filter(x=>x&&typeof x==="object").map(x=>{
+      const s=typeof x.s==="string"?x.s.slice(0,8):"❌";
+      return x.raw!=null?{s,raw:String(x.raw).slice(0,300)}:{s,nr:Math.max(1,+x.nr||1),f:Math.max(0,+x.f||0)};
+    })}));
+}
+function mergeLists(a,b){
+  const out=JSON.parse(JSON.stringify(a)),key=x=>x.n.trim().toLowerCase(),sk=s=>s.raw?"r:"+s.raw.toLowerCase():"n:"+s.nr;
+  b.forEach(bn=>{
+    const m=out.find(x=>key(x)===key(bn));
+    if(!m){out.push(JSON.parse(JSON.stringify(bn)));return}
+    if(!m.l&&bn.l)m.l=bn.l;
+    bn.seasons.forEach(bs=>{
+      const ms=m.seasons.find(x=>sk(x)===sk(bs));
+      if(!ms)m.seasons.push(JSON.parse(JSON.stringify(bs)));
+      else{
+        if((RANK[bs.s]??-1)>(RANK[ms.s]??-1))ms.s=bs.s;
+        if(!ms.raw&&!bs.raw)ms.f=Math.max(ms.f,bs.f);
+      }
+    });
+    if(m.seasons.every(x=>!x.raw))m.seasons.sort((x,y)=>x.nr-y.nr);
+  });
+  return out;
+}
+function backup(){if(!data.length)return;try{localStorage.setItem(BK,JSON.stringify({t:Date.now(),data}))}catch(e){}}
+function adopt(d,snap){
+  if(JSON.stringify(d)===JSON.stringify(data))return false;
+  if(snap)backup();
+  data=d;persist();
+  const was=$("shA").classList.contains("show")||$("shS").classList.contains("show");
+  $("shA").classList.remove("show");$("shS").classList.remove("show");
+  render();toast(was?"Liste wurde auf einem anderen Gerät geändert":"Liste aktualisiert ✔");
+  return true;
+}
+
+/* eigene Änderung -> an die anderen schicken */
+function pushLocal(){
+  if(!SYNC.on){setDirty(true);return}
+  if(SYNC.role==="host"&&SYNC.conns.length){SYNC.conns.forEach(c=>send(c,{t:"state",data}));setDirty(true)}
+  else if(SYNC.role==="client"&&SYNC.host&&SYNC.host.open){const n=++SYNC.seq;send(SYNC.host,{t:"update",data,n});setDirty(true)}
+  else setDirty(true);
+}
+
+/* Status-Anzeige */
+function setStat(s,msg){
+  SYNC.stat=s;SYNC.msg=msg||"";
+  const n=SYNC.conns.length;let t="Nicht verbunden",c="";
+  if(s==="connecting"){t="Verbinde …";c="wait"}
+  else if(s==="err"){t=msg||"Fehler";c="wait"}
+  else if(s==="host"){if(n){t=n===1?"Verbunden – 1 weiteres Gerät":`Verbunden – ${n} weitere Geräte`;c="on"}else{t="Bereit – wartet auf weitere Geräte";c="wait"}}
+  else if(s==="client"){t="Verbunden – Liste wird live abgeglichen";c="on"}
+  $("ctxt").textContent=t;$("cdot").className=c;$("dot").className="dot "+c;
+  $("cgo").textContent=SYNC.on?"Trennen":"Verbinden";
+}
+
+/* PeerJS erst bei Bedarf laden (App bleibt offline nutzbar) */
+let PEERJS=null;
+function loadPeer(){
+  if(window.Peer)return Promise.resolve();
+  return PEERJS||(PEERJS=new Promise((res,rej)=>{
+    const s=document.createElement("script");
+    s.src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js";
+    s.onload=res;s.onerror=()=>{PEERJS=null;rej(new Error("load"))};document.head.append(s);
+  }));
+}
+function killPeer(){
+  clearTimeout(SYNC.timer);const p=SYNC.peer;
+  SYNC.peer=null;SYNC.host=null;SYNC.conns=[];
+  if(p){try{p.destroy()}catch(e){}}
+}
+function healthy(){
+  if(SYNC.role==="host")return!!(SYNC.peer&&SYNC.peer.open&&!SYNC.peer.disconnected&&!SYNC.peer.destroyed);
+  if(SYNC.role==="client")return!!(SYNC.host&&SYNC.host.open);
+  return false;
+}
+async function syncStart(code){
+  const g=++SYNC.gen;killPeer();
+  SYNC.on=true;SYNC.code=code;SYNC.role="";
+  try{localStorage.setItem(CK,code);localStorage.setItem(AK,"1")}catch(e){}
+  setStat("connecting");
+  try{await loadPeer()}catch(e){if(g===SYNC.gen)setStat("err","Kein Internet – PeerJS konnte nicht geladen werden");return}
+  if(g!==SYNC.gen)return;
+  tryHost(g);
+}
+function syncStop(){
+  SYNC.on=false;SYNC.gen++;killPeer();SYNC.role="";
+  try{localStorage.setItem(AK,"0")}catch(e){}
+  setStat("off");
+}
+function retry(g,ms){
+  if(g!==SYNC.gen||!SYNC.on)return;
+  const ng=++SYNC.gen;killPeer();setStat("connecting");
+  SYNC.timer=setTimeout(()=>tryHost(ng),ms);
+}
+
+/* Versuch 1: selbst Host werden (Code als Peer-ID). Ist die ID schon vergeben -> als Gast beitreten. */
+function tryHost(g){
+  if(g!==SYNC.gen)return;
+  const p=new Peer(pid(SYNC.code),{debug:0});
+  SYNC.peer=p;SYNC.role="host";
+  p.on("open",()=>{if(g===SYNC.gen&&SYNC.peer===p)setStat("host")});
+  p.on("connection",c=>{if(g===SYNC.gen&&SYNC.peer===p)hostAccept(c,g)});
+  p.on("disconnected",()=>{if(g===SYNC.gen&&SYNC.peer===p&&!p.destroyed)setTimeout(()=>{try{if(SYNC.peer===p&&!p.destroyed)p.reconnect()}catch(e){}},1500)});
+  p.on("error",e=>{
+    if(g!==SYNC.gen||SYNC.peer!==p)return;
+    if(e.type==="unavailable-id"){const ng=++SYNC.gen;killPeer();tryJoin(ng)}
+    else retry(g,4000);
+  });
+}
+function hostAccept(c,g){
+  const reg=()=>{if(g!==SYNC.gen)return;if(!SYNC.conns.includes(c))SYNC.conns.push(c);setStat("host")};
+  if(c.open)reg();else c.on("open",reg);
+  c.on("data",m=>{if(g===SYNC.gen)hostMsg(c,m)});
+  c.on("close",()=>{if(g!==SYNC.gen)return;SYNC.conns=SYNC.conns.filter(x=>x!==c);setStat("host")});
+  c.on("error",()=>{});
+}
+function hostMsg(c,m){
+  if(!m||typeof m!=="object")return;
+  if(m.t==="hello"){
+    const rem=clean(m.data),hd=isDirty(),cd=!!m.dirty;
+    let res=data;
+    if(cd&&hd)res=mergeLists(data,rem);   /* beide haben Änderungen -> zusammenführen */
+    else if(cd)res=rem;                   /* nur der Gast hat Änderungen */
+    const changed=adopt(res,true);
+    setDirty(false);
+    send(c,{t:"state",data});
+    if(changed)SYNC.conns.forEach(x=>{if(x!==c)send(x,{t:"state",data})});
+  }else if(m.t==="update"){
+    const changed=adopt(clean(m.data),false);
+    setDirty(false);
+    send(c,{t:"ack",n:m.n});
+    if(changed)SYNC.conns.forEach(x=>{if(x!==c)send(x,{t:"state",data})});
+  }
+}
+
+/* Versuch 2: Gast – mit dem Host verbinden */
+function tryJoin(g){
+  if(g!==SYNC.gen)return;
+  const p=new Peer({debug:0});
+  SYNC.peer=p;SYNC.role="client";
+  p.on("open",()=>{
+    if(g!==SYNC.gen||SYNC.peer!==p)return;
+    const c=p.connect(pid(SYNC.code),{reliable:true});
+    SYNC.host=c;let opened=false;
+    c.on("open",()=>{if(g!==SYNC.gen||SYNC.host!==c)return;opened=true;SYNC.first=true;setStat("client");send(c,{t:"hello",data,dirty:isDirty()})});
+    c.on("data",m=>{if(g===SYNC.gen)clientMsg(m)});
+    c.on("close",()=>{if(g===SYNC.gen&&SYNC.host===c)retry(g,1200+Math.random()*2500)});
+    c.on("error",()=>{});
+    setTimeout(()=>{if(g===SYNC.gen&&SYNC.host===c&&!opened)retry(g,500)},9000);
+  });
+  p.on("error",e=>{if(g===SYNC.gen&&SYNC.peer===p)retry(g,e.type==="peer-unavailable"?900:4000)});
+}
+function clientMsg(m){
+  if(!m||typeof m!=="object")return;
+  if(m.t==="state"){const f=SYNC.first;adopt(clean(m.data),f);SYNC.first=false;if(f)setDirty(false)}
+  else if(m.t==="ack"&&m.n===SYNC.seq)setDirty(false);
+}
+
+/* Bedienung */
+function openC(){
+  if(!$("cc").value)$("cc").value=SYNC.code||localStorage.getItem(CK)||newCode();
+  $("cbk").style.display=localStorage.getItem(BK)?"flex":"none";
+  setStat(SYNC.stat,SYNC.msg);$("shC").classList.add("show");
+}
+$("syncBtn").onclick=openC;
+$("cnew").onclick=()=>{if(SYNC.on){toast("Erst trennen");return}$("cc").value=newCode()};
+$("cgo").onclick=()=>{
+  if(SYNC.on){syncStop();toast("Getrennt");return}
+  const c=codeVal();if(c.length<6){toast("Code zu kurz (mind. 6 Zeichen)");return}
+  $("cc").value=c;syncStart(c);
+};
+$("ccopy").onclick=async()=>{
+  const c=codeVal();if(c.length<6){toast("Code zu kurz (mind. 6 Zeichen)");return}
+  const url=location.origin+location.pathname+"#sync="+c;
+  try{await navigator.clipboard.writeText(url);toast("Link kopiert ✔")}catch(e){prompt("Link kopieren:",url)}
+};
+$("crest").onclick=()=>{
+  let b=null;try{b=JSON.parse(localStorage.getItem(BK))}catch(e){}
+  if(!b||!Array.isArray(b.data))return;
+  if(!confirm("Liste vom "+new Date(b.t).toLocaleString("de-DE")+" wiederherstellen? Die aktuelle Liste wird ersetzt."))return;
+  data=clean(b.data);persist();render();pushLocal();toast("Wiederhergestellt ✔");
+};
+window.addEventListener("online",()=>{if(SYNC.on&&!healthy())syncStart(SYNC.code)});
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&SYNC.on&&!healthy())syncStart(SYNC.code)});
+(function(){
+  const m=location.hash.match(/^#sync=([A-Za-z0-9]{6,16})$/);
+  if(m){const c=m[1].toUpperCase();$("cc").value=c;history.replaceState(null,"",location.pathname+location.search);syncStart(c);return}
+  const c=localStorage.getItem(CK);
+  if(c){$("cc").value=c;if(localStorage.getItem(AK)==="1")syncStart(c)}
+})();
 
 /* PWA: Offline-Cache, Installieren-Button, Speicher dauerhaft anfordern */
 if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
