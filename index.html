@@ -87,6 +87,9 @@ main{padding:4px 12px 120px}
 .cstat i.on{background:var(--ok)}.cstat i.wait{background:#ffb347}
 #cc{text-transform:uppercase;letter-spacing:3px;font-weight:600}
 .hint{color:var(--tx3);font-size:13px;margin:14px 2px 0}
+body.ro #add,body.ro #loadBtn,body.ro .addS{display:none}
+body.ro .x,body.ro .tx,body.ro .title .t{pointer-events:none}
+.srv{display:none}.srvmode .srv{display:block}.srvmode .pc{display:none}
 </style>
 </head>
 <body>
@@ -117,11 +120,13 @@ main{padding:4px 12px 120px}
 </div></div>
 <div class="sheet" id="shC"><div class="panel">
   <div class="cstat"><i id="cdot"></i><span id="ctxt">Nicht verbunden</span></div>
-  <label>Code (auf allen Geräten gleich)</label>
-  <div class="two"><div style="flex:3"><input id="cc" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false"></div><div><button class="btn" id="cnew" style="width:100%;height:100%">Neu</button></div></div>
-  <div class="btns"><button class="btn" id="ccopy">Link kopieren</button><button class="btn main" id="cgo">Verbinden</button></div>
+  <label class="pc">Code (auf allen Geräten gleich)</label>
+  <div class="two pc"><div style="flex:3"><input id="cc" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false"></div><div><button class="btn" id="cnew" style="width:100%;height:100%">Neu</button></div></div>
+  <div class="btns"><button class="btn" id="cro"></button></div>
+  <div class="btns pc"><button class="btn" id="ccopy">Link kopieren</button><button class="btn main" id="cgo">Verbinden</button></div>
   <div class="btns" id="cbk" style="display:none"><button class="btn bad" id="crest">Vorherige Liste wiederherstellen</button></div>
-  <p class="hint">Gib auf jedem Gerät denselben Code ein (oder öffne den kopierten Link) und tippe auf „Verbinden“. Die Liste wird live abgeglichen, solange mindestens zwei Geräte gleichzeitig offen sind – sonst beim nächsten Verbinden. Wer den Code kennt, kann deine Liste sehen und ändern.</p>
+  <p class="hint srv">Du bist mit dem PC-Host (list_host.py) verbunden. Jedes Gerät, das diese Adresse öffnet, sieht dieselbe Liste; Änderungen erscheinen nach 1–2 Sekunden.</p>
+  <p class="hint pc">Gib auf jedem Gerät denselben Code ein (oder öffne den kopierten Link) und tippe auf „Verbinden“. Die Liste wird live abgeglichen, solange mindestens zwei Geräte gleichzeitig offen sind – sonst beim nächsten Verbinden. Wer den Code kennt, kann deine Liste sehen und ändern.</p>
   <div class="btns"><button class="btn" data-close>Schließen</button></div>
 </div></div>
 <input type="file" id="file" accept=".txt,text/plain" hidden>
@@ -256,10 +261,11 @@ load();render();
    Alle Geräte geben denselben Code ein. Das erste Gerät wird "Host", die anderen verbinden sich mit ihm.
    Fällt der Host weg, übernimmt automatisch ein anderes Gerät. Die Daten bleiben immer auch lokal gespeichert. */
 const CK="alm2_code",AK="alm2_auto",DK="alm2_dirty",BK="alm2_backup";
+const RK="alm2_ro";let RO=false;try{RO=localStorage.getItem(RK)==="1"}catch(e){}
 const SYNC={peer:null,role:"",host:null,conns:[],gen:0,code:"",on:false,timer:null,stat:"off",msg:"",seq:0,first:false};
 const RANK={"❌":0,"🡇":1,"✔":2};
 const pid=c=>"almaster-"+c.toLowerCase();
-const isDirty=()=>{const v=localStorage.getItem(DK);return v===null?data.length>0:v==="1"};
+const isDirty=()=>{if(RO)return false;const v=localStorage.getItem(DK);return v===null?data.length>0:v==="1"};
 const setDirty=b=>{try{localStorage.setItem(DK,b?"1":"0")}catch(e){}};
 const send=(c,m)=>{try{if(c&&c.open)c.send(m)}catch(e){}};
 const newCode=()=>{const A="ABCDEFGHJKLMNPQRSTUVWXYZ23456789",r=crypto.getRandomValues(new Uint8Array(8));return[...r].map(x=>A[x%A.length]).join("")};
@@ -305,6 +311,8 @@ function adopt(d,snap){
 
 /* eigene Änderung -> an die anderen schicken */
 function pushLocal(){
+  if(RO)return;   /* Nur-Empfänger sendet nie etwas */
+  if(SRV.on){SRV.pending=true;SRV.ver++;setDirty(true);clearTimeout(SRV.pt);SRV.pt=setTimeout(srvSync,250);return}
   if(!SYNC.on){setDirty(true);return}
   if(SYNC.role==="host"&&SYNC.conns.length){SYNC.conns.forEach(c=>send(c,{t:"state",data}));setDirty(true)}
   else if(SYNC.role==="client"&&SYNC.host&&SYNC.host.open){const n=++SYNC.seq;send(SYNC.host,{t:"update",data,n});setDirty(true)}
@@ -319,6 +327,8 @@ function setStat(s,msg){
   else if(s==="err"){t=msg||"Fehler";c="wait"}
   else if(s==="host"){if(n){t=n===1?"Verbunden – 1 weiteres Gerät":`Verbunden – ${n} weitere Geräte`;c="on"}else{t="Bereit – wartet auf weitere Geräte";c="wait"}}
   else if(s==="client"){t="Verbunden – Liste wird live abgeglichen";c="on"}
+  else if(s==="srv"){t="Verbunden mit PC-Host";c="on"}
+  else if(s==="srvfail"){t="PC-Host nicht erreichbar – versuche es weiter …";c="wait"}
   $("ctxt").textContent=t;$("cdot").className=c;$("dot").className="dot "+c;
   $("cgo").textContent=SYNC.on?"Trennen":"Verbinden";
 }
@@ -389,7 +399,9 @@ function hostMsg(c,m){
   if(m.t==="hello"){
     const rem=clean(m.data),hd=isDirty(),cd=!!m.dirty;
     let res=data;
-    if(cd&&hd)res=mergeLists(data,rem);   /* beide haben Änderungen -> zusammenführen */
+    if(m.ro){}                            /* Gast ist nur Empfänger -> seine Daten zählen nicht */
+    else if(RO)res=rem;                   /* dieses Gerät ist nur Empfänger -> Daten vom Gast übernehmen */
+    else if(cd&&hd)res=mergeLists(data,rem);   /* beide haben Änderungen -> zusammenführen */
     else if(cd)res=rem;                   /* nur der Gast hat Änderungen */
     const changed=adopt(res,true);
     setDirty(false);
@@ -412,7 +424,7 @@ function tryJoin(g){
     if(g!==SYNC.gen||SYNC.peer!==p)return;
     const c=p.connect(pid(SYNC.code),{reliable:true});
     SYNC.host=c;let opened=false;
-    c.on("open",()=>{if(g!==SYNC.gen||SYNC.host!==c)return;opened=true;SYNC.first=true;setStat("client");send(c,{t:"hello",data,dirty:isDirty()})});
+    c.on("open",()=>{if(g!==SYNC.gen||SYNC.host!==c)return;opened=true;SYNC.first=true;setStat("client");send(c,{t:"hello",data,dirty:isDirty(),ro:RO})});
     c.on("data",m=>{if(g===SYNC.gen)clientMsg(m)});
     c.on("close",()=>{if(g===SYNC.gen&&SYNC.host===c)retry(g,1200+Math.random()*2500)});
     c.on("error",()=>{});
@@ -426,12 +438,79 @@ function clientMsg(m){
   else if(m.t==="ack"&&m.n===SYNC.seq)setDirty(false);
 }
 
+/* ===== PC-Host-Modus: Seite wird von list_host.py ausgeliefert ===== */
+const SRV={on:false,rev:-1,first:true,busy:false,again:false,pending:false,ver:0,fail:0,timer:null,pt:null};
+async function srvApi(path,opt){
+  const c=new AbortController(),t=setTimeout(()=>c.abort(),6000);
+  try{return await fetch(path,Object.assign({signal:c.signal,cache:"no-store"},opt||{}))}finally{clearTimeout(t)}
+}
+async function srvDetect(){
+  if(!/^https?:$/.test(location.protocol))return false;
+  try{const r=await srvApi("api/ping");if(!r.ok)return false;const j=await r.json();return!!(j&&j.app==="almhost")}catch(e){return false}
+}
+function srvStart(){
+  SRV.on=true;SRV.first=true;SRV.rev=-1;SRV.pending=isDirty()&&data.length>0;
+  document.body.classList.add("srvmode");
+  setStat("srv");srvSync();
+  clearInterval(SRV.timer);SRV.timer=setInterval(srvSync,1500);
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden&&SRV.on)srvSync()});
+  window.addEventListener("online",()=>{if(SRV.on)srvSync()});
+}
+async function srvSync(){
+  if(!SRV.on)return;
+  if(SRV.busy){SRV.again=true;return}
+  SRV.busy=true;
+  try{
+    do{SRV.again=false;await srvStep()}while(SRV.again);
+    SRV.fail=0;setStat("srv");
+  }catch(e){SRV.fail++;setStat("srvfail")}
+  finally{SRV.busy=false}
+}
+async function srvStep(){
+  /* 1) Neuen Stand vom PC holen */
+  const r=await srvApi("api/data?since="+SRV.rev);
+  if(!r.ok)throw new Error("http "+r.status);
+  const j=await r.json();
+  if(!j.same){
+    const S=clean(j.data);
+    if(RO)adopt(S,SRV.first);
+    else if(SRV.first){
+      if(isDirty()&&data.length){adopt(S.length?mergeLists(S,data):data,true);SRV.pending=true;SRV.ver++}
+      else{adopt(S,true);SRV.pending=false;setDirty(false)}
+    }else if(SRV.pending){adopt(mergeLists(S,data),false);SRV.ver++}
+    else adopt(S,false);
+    SRV.rev=j.rev;
+  }
+  SRV.first=false;
+  /* 2) Eigene Änderungen zum PC schicken */
+  if(SRV.pending&&!RO){
+    for(let i=0;i<4;i++){
+      const ver=SRV.ver;
+      const pr=await srvApi("api/data",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({data,base:SRV.rev})});
+      if(pr.status===409){const k=await pr.json();adopt(mergeLists(clean(k.data),data),false);SRV.rev=k.rev;SRV.ver++;continue}
+      if(!pr.ok)throw new Error("http "+pr.status);
+      const k=await pr.json();SRV.rev=k.rev;
+      if(SRV.ver===ver){SRV.pending=false;setDirty(false)}else SRV.again=true;
+      break;
+    }
+  }
+}
+
 /* Bedienung */
 function openC(){
   if(!$("cc").value)$("cc").value=SYNC.code||localStorage.getItem(CK)||newCode();
   $("cbk").style.display=localStorage.getItem(BK)?"flex":"none";
   setStat(SYNC.stat,SYNC.msg);$("shC").classList.add("show");
 }
+function applyRO(){
+  document.body.classList.toggle("ro",RO);
+  $("cro").textContent=RO?"Nur empfangen: AN (nicht bearbeitbar)":"Nur empfangen: AUS";
+  $("cro").className="btn"+(RO?" main":"");
+}
+$("cro").onclick=()=>{RO=!RO;try{localStorage.setItem(RK,RO?"1":"0")}catch(e){}applyRO();
+  if(!RO&&SYNC.on)pushLocal();
+  toast(RO?"Nur-Empfänger-Modus an":"Bearbeiten wieder möglich")};
+applyRO();
 $("syncBtn").onclick=openC;
 $("cnew").onclick=()=>{if(SYNC.on){toast("Erst trennen");return}$("cc").value=newCode()};
 $("cgo").onclick=()=>{
@@ -452,7 +531,8 @@ $("crest").onclick=()=>{
 };
 window.addEventListener("online",()=>{if(SYNC.on&&!healthy())syncStart(SYNC.code)});
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&SYNC.on&&!healthy())syncStart(SYNC.code)});
-(function(){
+(async function(){
+  if(await srvDetect()){srvStart();return}
   const m=location.hash.match(/^#sync=([A-Za-z0-9]{6,16})$/);
   if(m){const c=m[1].toUpperCase();$("cc").value=c;history.replaceState(null,"",location.pathname+location.search);syncStart(c);return}
   const c=localStorage.getItem(CK);
