@@ -89,21 +89,13 @@ main{padding:4px 12px 120px}
   <input id="q" type="search" placeholder="Suchen …" autocomplete="off">
 </header>
 <main id="list"></main>
-<div class="fabs"><button class="fab sm" id="saveBtn" aria-label="PDF erstellen / senden"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h8l2 2v8H3zM5.5 3v3.5h4V3M5.5 13V9.5h5V13"/></svg></button><button class="fab" id="add" aria-label="Neuer Anime"><svg width="26" height="26" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M3 8h10"/></svg></button></div>
+<div class="fabs"><button class="fab sm" id="saveBtn" aria-label="Als PDF speichern"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h8l2 2v8H3zM5.5 3v3.5h4V3M5.5 13V9.5h5V13"/></svg></button><button class="fab" id="add" aria-label="Neuer Anime"><svg width="26" height="26" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M3 8h10"/></svg></button></div>
 
 <div class="sheet" id="shA"><div class="panel">
   <label>Name</label><input id="an" autocomplete="off">
   <label>Link (optional)</label><input id="al" type="url" inputmode="url" autocomplete="off">
   <div class="btns"><button class="btn" data-close>Abbrechen</button><button class="btn main" id="aok">Speichern</button></div>
   <div class="btns" id="aext"><button class="btn bad" id="adel">Anime löschen</button></div>
-</div></div>
-
-<div class="sheet" id="shP"><div class="panel">
-  <div class="btns"><button class="btn main" id="pSend">PDF senden</button></div>
-  <div class="btns"><button class="btn" id="pMake">PDF speichern</button></div>
-  <p class="hint">„PDF senden“ öffnet das Teilen-Menü deines Handys. „PDF speichern“ legt die Datei im Downloads-Ordner ab – von dort kannst du sie z. B. in FastTransfer auswählen.</p>
-  <div class="btns"><button class="btn" id="pTxt">Als Textdatei speichern</button></div>
-  <div class="btns"><button class="btn" data-close>Schließen</button></div>
 </div></div>
 
 <div class="sheet" id="shS"><div class="panel">
@@ -248,44 +240,72 @@ function wrap(t,size,maxW){
   out.push(w);return out;
 }
 function makePDF(){
-  const W=595,H=842,M=44,TOP=H-M,BOT=M+10,maxW=W-2*M;
+  const W=595,H=842,M=40,TOP=H-M,BOT=M+16,CW=W-2*M;
   const pages=[];let cur=[],y=TOP;
   const np=()=>{pages.push(cur.join("\n"));cur=[];y=TOP};
-  const need=h=>{if(y-h<BOT)np()};
-  const text=(t,x,size,bold,rgb)=>cur.push(`BT /${bold?"F2":"F1"} ${size} Tf ${(rgb||[0,0,0]).join(" ")} rg ${x} ${y.toFixed(1)} Td (${PESC(t)}) Tj ET`);
-  const COL={"✔":[0.25,0.65,0.25],"❌":[0.85,0.3,0.35],"🡇":[0.2,0.55,0.85]};
-  const WORD={"✔":"Fertig","❌":"Offen","🡇":"Download"};
+  const f2=n=>(+n).toFixed(2);
+  const T=(t,x,yy,size,bold,rgb)=>cur.push(`BT /${bold?"F2":"F1"} ${size} Tf ${(rgb||[0,0,0]).map(f2).join(" ")} rg ${f2(x)} ${f2(yy)} Td (${PESC(t)}) Tj ET`);
+  const rr=(x,yy,w,hh,r,fill,stroke)=>{
+    const k=r*0.5523,X=x+w,Y=yy+hh;
+    return `${fill.map(f2).join(" ")} rg ${stroke?stroke.map(f2).join(" ")+" RG 0.6 w ":""}`+
+    `${f2(x+r)} ${f2(yy)} m ${f2(X-r)} ${f2(yy)} l ${f2(X-r+k)} ${f2(yy)} ${f2(X)} ${f2(yy+r-k)} ${f2(X)} ${f2(yy+r)} c `+
+    `${f2(X)} ${f2(Y-r)} l ${f2(X)} ${f2(Y-r+k)} ${f2(X-r+k)} ${f2(Y)} ${f2(X-r)} ${f2(Y)} c `+
+    `${f2(x+r)} ${f2(Y)} l ${f2(x+r-k)} ${f2(Y)} ${f2(x)} ${f2(Y-r+k)} ${f2(x)} ${f2(Y-r)} c `+
+    `${f2(x)} ${f2(yy+r)} l ${f2(x)} ${f2(yy+r-k)} ${f2(x+r-k)} ${f2(yy)} ${f2(x+r)} ${f2(yy)} c h ${stroke?"B":"f"}`;
+  };
+  /* Status-Symbole wie in der App-Kachel: farbiger Kreis mit Haken, Kreuz oder Pfeil */
+  const COL={"✔":[0.30,0.72,0.28],"❌":[0.95,0.45,0.52],"🡇":[0.25,0.65,0.95]};
+  const TINT={"✔":[0.92,0.97,0.91],"❌":[1,0.93,0.94],"🡇":[0.91,0.96,1]};
+  const SH={"✔":[[[3.5,8.5],[6.5,11.5],[12.5,5]]],"❌":[[[4.5,4.5],[11.5,11.5]],[[11.5,4.5],[4.5,11.5]]],"🡇":[[[8,3.5],[8,11.5]],[[4.8,8.4],[8,11.6],[11.2,8.4]]]};
+  const icon=(cx,cy,D,s)=>{
+    const c=COL[s]||[0.6,0.6,0.6];
+    cur.push(rr(cx-D/2,cy-D/2,D,D,D/2,c));
+    const sc=D/24,pt=p=>`${f2(cx-D/2+(4+p[0])*sc)} ${f2(cy+D/2-(4+p[1])*sc)}`;
+    (SH[s]||[]).forEach(l=>cur.push(`0.1 0.1 0.1 RG ${f2(1.9*sc)} w 1 J 1 j ${pt(l[0])} m ${l.slice(1).map(p=>pt(p)+" l").join(" ")} S`));
+  };
+  const gray=[0.45,0.45,0.45],blue=[0.15,0.4,0.8];
   const d=new Date().toLocaleDateString("de-DE");
-  text("Anime-Liste",M,20,true);y-=22;
-  text(`${data.length} Anime - Stand ${d}`,M,9,false,[0.4,0.4,0.4]);y-=22;
+  T("Anime-Liste",M,y-18,20,true);y-=24;
+  T(`${data.length} Anime - Stand ${d}`,M,y-10,9,false,gray);y-=26;
   data.forEach(a=>{
-    const done=a.seasons.filter(x=>x.s==="✔").length;
-    const head=wrap(a.n+(a.seasons.length?`  (${done}/${a.seasons.length})`:""),12,maxW);
-    need(head.length*15+16+(a.seasons.length?15:0));
-    y-=4;head.forEach(l=>{text(l,M,12,true);y-=15});
-    if(a.l){wrap(a.l,8,maxW-12).forEach(l=>{need(11);text(l,M,8,false,[0.2,0.4,0.8]);y-=11})}
-    a.seasons.forEach(x=>{
-      const lab=x.raw?x.raw:`Staffel ${x.nr} - ${x.f} Folgen`;
-      const ls=wrap(lab,10,maxW-90);
-      need(ls.length*13);
-      const c=COL[x.s]||[0.5,0.5,0.5];
-      cur.push(`${c.join(" ")} rg ${M+2} ${(y-1).toFixed(1)} 7 7 re f`);
-      ls.forEach((l,k)=>{text(l,M+16,10,false);if(k===0)text(WORD[x.s]||x.s,W-M-60,10,false,c);y-=13});
+    const n=a.seasons.length,done=a.seasons.filter(x=>x.s==="✔").length,full=n&&done===n;
+    const lines=wrap(a.n,12,CW-90),links=a.l?wrap(a.l,8,CW-24):[];
+    const total=8+lines.length*15+links.length*11+(n?12:0)+n*25+8;
+    if(total<=TOP-BOT&&y-total<BOT)np();
+    const startY=y,idx=cur.length,x0=M+12;
+    y-=8;
+    lines.forEach((l,k)=>{
+      T(l,x0,y-11,12,true);
+      if(k===0&&n)T(`${done}/${n}`,M+CW-12-String(done+"/"+n).length*5.2,y-11,10,false,full?COL["✔"]:gray);
+      y-=15;
     });
+    links.forEach(l=>{T(l,x0,y-8,8,false,blue);y-=11});
+    if(n){
+      y-=2;cur.push(rr(x0,y-4,CW-24,4,2,[0.86,0.86,0.86]));
+      if(done)cur.push(rr(x0,y-4,Math.max(4,(CW-24)*done/n),4,2,full?COL["✔"]:COL["🡇"]));
+      y-=10;
+    }
+    a.seasons.forEach(x=>{
+      if(y-25<BOT)np();
+      cur.push(rr(M+8,y-22,CW-16,22,5,TINT[x.s]||[0.95,0.95,0.95]));
+      icon(M+8+17,y-11,14,x.s);
+      const tx=M+8+34;
+      if(x.raw){let r=x.raw;if(r.length>90)r=r.slice(0,87)+"...";T(r,tx,y-15,10,true)}
+      else{const s1="Staffel "+x.nr;T(s1,tx,y-15,10,true);T(`${x.f} Folgen`,tx+s1.length*5.6+10,y-15,9,false,gray)}
+      y-=25;
+    });
+    y-=8;
+    if(total<=TOP-BOT)cur.splice(idx,0,rr(M,y,CW,startY-y,7,[0.965,0.965,0.965],[0.84,0.84,0.84]));
     y-=8;
   });
   pages.push(cur.join("\n"));
-  const N=pages.length;
-  const objs=[];const add=s=>objs.push(s)-1+1;
-  // 1 catalog, 2 pages, 3 F1, 4 F2, dann je Seite: Seite + Inhalt
+  const N=pages.length,objs=[];
   objs.push("<< /Type /Catalog /Pages 2 0 R >>");
-  const kids=pages.map((_,i)=>`${5+i*2} 0 R`).join(" ");
-  objs.push(`<< /Type /Pages /Kids [${kids}] /Count ${N} >>`);
+  objs.push(`<< /Type /Pages /Kids [${pages.map((_,i)=>`${5+i*2} 0 R`).join(" ")}] /Count ${N} >>`);
   objs.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
   objs.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>");
   pages.forEach((p,i)=>{
-    const foot=`BT /F1 8 Tf 0.5 0.5 0.5 rg ${W-M-50} 24 Td (Seite ${i+1} / ${N}) Tj ET`;
-    const body=p+"\n"+foot;
+    const body=p+"\n"+`BT /F1 8 Tf 0.5 0.5 0.5 rg ${W-M-50} 24 Td (Seite ${i+1} / ${N}) Tj ET`;
     objs.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${6+i*2} 0 R >>`);
     objs.push(`<< /Length ${body.length} >>\nstream\n${body}\nendstream`);
   });
@@ -305,16 +325,9 @@ function download(file){
   const a=document.createElement("a");a.href=URL.createObjectURL(file);a.download=file.name;
   document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
 }
-$("saveBtn").onclick=()=>{if(!data.length){toast("Nichts zu speichern");return}$("shP").classList.add("show")};
-$("pMake").onclick=()=>{try{download(pdfFile());toast("PDF gespeichert ✔")}catch(e){toast("PDF konnte nicht erstellt werden")}};
-$("pSend").onclick=async()=>{
-  let f;try{f=pdfFile()}catch(e){toast("PDF konnte nicht erstellt werden");return}
-  if(navigator.canShare&&navigator.canShare({files:[f]})){try{await navigator.share({files:[f],title:"Anime-Liste"})}catch(e){}}
-  else{download(f);toast("Teilen geht hier nicht – PDF wurde gespeichert")}
-};
-$("pTxt").onclick=()=>{
-  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([toText()],{type:"text/plain;charset=utf-8"}));
-  a.download="anime_liste.txt";document.body.append(a);a.click();a.remove();toast("Textdatei gespeichert ✔");
+$("saveBtn").onclick=()=>{
+  if(!data.length){toast("Nichts zu speichern");return}
+  try{download(pdfFile());toast("PDF gespeichert ✔")}catch(e){toast("PDF konnte nicht erstellt werden")}
 };
 
 /* PWA: Offline-Cache, Installieren-Button, Speicher dauerhaft anfordern */
