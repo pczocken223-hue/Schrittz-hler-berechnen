@@ -1,4 +1,4 @@
-const CACHE = 'listmaster-v2';
+const CACHE = 'listmaster-v3';
 const ASSETS = [
   './index.html',
   './manifest.json',
@@ -24,7 +24,7 @@ self.addEventListener('activate', e => {
 });
 
 // Netzwerk zuerst (so kommen Updates sofort an), Cache als Offline-Fallback.
-// Fremde Adressen (z. B. PeerJS vom CDN) fasst der Service Worker nicht an.
+// Fremde Adressen fasst der Service Worker nicht an.
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
