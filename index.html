@@ -126,7 +126,7 @@ body.ro .x,body.ro .tx,body.ro .title .t{pointer-events:none}
   <div class="btns pc"><button class="btn" id="ccopy">Link kopieren</button><button class="btn main" id="cgo">Verbinden</button></div>
   <div class="btns" id="cbk" style="display:none"><button class="btn bad" id="crest">Vorherige Liste wiederherstellen</button></div>
   <p class="hint srv">Du bist mit dem PC-Host (list_host.py) verbunden. Jedes Gerät, das diese Adresse öffnet, sieht dieselbe Liste; Änderungen erscheinen nach 1–2 Sekunden.</p>
-  <p class="hint pc">Gib auf jedem Gerät denselben Code ein (oder öffne den kopierten Link) und tippe auf „Verbinden“. Die Liste wird live abgeglichen, solange mindestens zwei Geräte gleichzeitig offen sind – sonst beim nächsten Verbinden. Wer den Code kennt, kann deine Liste sehen und ändern.</p>
+  <p class="hint pc"><b>Mit PC-Host:</b> Läuft auf dem PC list_host.py, öffne auf dem Handy dessen Adresse (z. B. http://192.168.x.x:8765) statt dieser Seite.<br><br>Gib auf jedem Gerät denselben Code ein (oder öffne den kopierten Link) und tippe auf „Verbinden“. Die Liste wird live abgeglichen, solange mindestens zwei Geräte gleichzeitig offen sind – sonst beim nächsten Verbinden. Wer den Code kennt, kann deine Liste sehen und ändern.</p>
   <div class="btns"><button class="btn" data-close>Schließen</button></div>
 </div></div>
 <input type="file" id="file" accept=".txt,text/plain" hidden>
@@ -142,6 +142,7 @@ const svg=(d,n,c)=>`<svg width="${n}" height="${n}" viewBox="0 0 16 16" fill="no
 const ico=(s,n=30)=>P[s]?`<svg width="${n}" height="${n}" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="${COLR[s]}"/><g transform="translate(4 4)" fill="none" stroke="#1a1a1a" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="${P[s]}"/></g></svg>`:`<svg width="${n}" height="${n}" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="#9a9a9a" stroke-width="1.6"/></svg>`;
 const KEY="alm2_data";
 let data=[], q="", ai=-1, si=-1, st="❌";
+var HM=0;
 
 function load(){try{data=JSON.parse(localStorage.getItem(KEY))||[]}catch(e){data=[]}}
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){toast("Speichern im Browser fehlgeschlagen")}}
@@ -178,7 +179,7 @@ function render(){
     const add=el("button","addS");add.innerHTML=svg(PL,14)+"<span>Staffel hinzufügen</span>";add.onclick=()=>openS(i,-1);
     c.append(add);box.append(c);
   });
-  if(!n)box.append(el("div","empty",data.length?"Nichts gefunden.":"Noch leer. Tippe unten auf +, um einen Anime einzutragen."));
+  if(!n)box.append(el("div","empty",data.length?"Nichts gefunden.":(HM?"Der PC-Host ist noch leer. Lade deine alte Liste (Textdatei) über den Ordner-Button oben. Ist „Nur empfangen“ an, schalte es dafür kurz aus (Verbinden-Symbol).":"Noch leer. Tippe unten auf +, um einen Anime einzutragen.")));
 }
 $("q").oninput=e=>{q=e.target.value;render()};
 
@@ -327,7 +328,7 @@ function setStat(s,msg){
   else if(s==="err"){t=msg||"Fehler";c="wait"}
   else if(s==="host"){if(n){t=n===1?"Verbunden – 1 weiteres Gerät":`Verbunden – ${n} weitere Geräte`;c="on"}else{t="Bereit – wartet auf weitere Geräte";c="wait"}}
   else if(s==="client"){t="Verbunden – Liste wird live abgeglichen";c="on"}
-  else if(s==="srv"){t="Verbunden mit PC-Host";c="on"}
+  else if(s==="srv"){t="Verbunden mit PC-Host – "+data.length+" Anime";c="on"}
   else if(s==="srvfail"){t="PC-Host nicht erreichbar – versuche es weiter …";c="wait"}
   $("ctxt").textContent=t;$("cdot").className=c;$("dot").className="dot "+c;
   $("cgo").textContent=SYNC.on?"Trennen":"Verbinden";
@@ -450,7 +451,7 @@ async function srvDetect(){
 }
 function srvStart(){
   SRV.on=true;SRV.first=true;SRV.rev=-1;SRV.pending=isDirty()&&data.length>0;
-  document.body.classList.add("srvmode");
+  document.body.classList.add("srvmode");HM=1;render();
   setStat("srv");srvSync();
   clearInterval(SRV.timer);SRV.timer=setInterval(srvSync,1500);
   document.addEventListener("visibilitychange",()=>{if(!document.hidden&&SRV.on)srvSync()});
