@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#272727">
+<meta name="color-scheme" content="dark">
+<title>Anime List Master</title>
+<meta name="description" content="Anime-Liste mit Staffeln, Folgen und Status">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="List Master">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+:root{--bg:#202020;--layer:#272727;--card:#2b2b2b;--hover:#323232;--stroke:#383838;--stroke2:#4a4a4a;
+--tx:#fff;--tx2:#c9c9c9;--tx3:#9a9a9a;--acc:#60cdff;--accf:#4cc2ff;--ok:#6ccb5f;--bad:#ff99a4;
+--okbg:rgba(108,203,95,.10);--badbg:rgba(255,153,164,.10);--dlbg:rgba(96,205,255,.10);
+--fill:rgba(255,255,255,.06);--fillb:rgba(255,255,255,.08)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 "Segoe UI Variable","Segoe UI",system-ui,Roboto,sans-serif}
+body{padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0)}
+svg{display:block}
+header{position:sticky;top:0;z-index:5;background:var(--layer);padding:10px 12px;border-bottom:1px solid var(--stroke)}
+.top{display:flex;align-items:center;gap:8px}
+h1{font-size:17px;font-weight:600;margin:0;flex:1;display:flex;align-items:center;gap:10px}
+h1 img{width:26px;height:26px;border-radius:6px}
+.ic{background:var(--fill);border:1px solid var(--fillb);color:var(--tx);border-radius:6px;width:38px;height:38px;display:grid;place-items:center}
+.ic:active,.btn:active{background:rgba(255,255,255,.04);color:var(--tx2)}
+#inst{display:none;background:rgba(96,205,255,.14);color:var(--acc);border:none;border-radius:6px;padding:0 12px;height:38px;font-weight:600;font-size:14px}
+input{width:100%;background:var(--fill);color:var(--tx);border:1px solid rgba(255,255,255,.07);border-bottom:1px solid #8a8a8a;border-radius:5px;padding:10px 11px;font-size:16px;outline:none}
+input:focus{background:#1c1c1c;border-bottom:2px solid var(--acc);padding-bottom:9px}
+#q{margin-top:9px}
+main{padding:4px 12px 120px}
+.card{background:var(--card);border:1px solid var(--stroke);border-radius:8px;padding:12px;margin:12px 0;animation:in .22s ease}
+@keyframes in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+.title{display:flex;align-items:center;gap:8px;padding:0 2px 8px}
+.title .t{flex:1;font-size:17px;font-weight:600;overflow-wrap:anywhere}
+.sum{font-size:13px;font-weight:600;color:var(--acc);background:rgba(96,205,255,.12);border-radius:6px;padding:2px 9px}
+.sum.full{color:var(--ok);background:rgba(108,203,95,.14)}
+.lnk{color:var(--acc);padding:6px;border-radius:6px}
+.lnk:active{background:var(--fill)}
+.bar{height:3px;border-radius:2px;background:rgba(255,255,255,.09);overflow:hidden;margin:0 2px 8px}
+.bar i{display:block;height:100%;background:var(--acc);border-radius:2px;transition:width .3s}
+.bar.full i{background:var(--ok)}
+.s{display:flex;align-items:center;gap:11px;border-radius:7px;padding:8px 10px;margin:6px 0;border-left:3px solid transparent}
+.s.ok{background:var(--okbg);border-left-color:rgba(108,203,95,.6)}
+.s.no{background:var(--badbg);border-left-color:rgba(255,153,164,.6)}
+.s.dl{background:var(--dlbg);border-left-color:rgba(96,205,255,.6)}
+.x{flex:none;width:32px;height:32px;padding:0;border:none;background:none;border-radius:50%}
+.x:active{transform:scale(.9)}
+.tx{flex:1;display:flex;flex-direction:column}
+.tx .m{font-weight:600}.tx .sub{color:var(--tx3);font-size:13px}
+.addS{width:100%;margin-top:4px;display:flex;align-items:center;justify-content:center;gap:6px;background:var(--fill);border:1px solid var(--fillb);color:var(--tx2);border-radius:6px;padding:9px;font-size:14px}
+.addS:active{background:rgba(255,255,255,.04)}
+.empty{text-align:center;color:var(--tx3);margin-top:60px}
+.fabs{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0));display:flex;gap:12px;align-items:center}
+.fab{width:56px;height:56px;border-radius:50%;border:none;background:var(--accf);color:#000;display:grid;place-items:center;box-shadow:0 6px 16px #0006}
+.fab:active{background:#42a1d2;transform:scale(.95)}
+.fab.sm{width:46px;height:46px;background:var(--card);color:var(--tx);border:1px solid var(--stroke2)}
+.sheet{position:fixed;inset:0;z-index:10;background:#0009;display:none;align-items:flex-end}
+.sheet.show{display:flex}
+.panel{width:100%;background:var(--card);border-top:1px solid var(--stroke2);border-radius:12px 12px 0 0;padding:10px 14px calc(16px + env(safe-area-inset-bottom,0));max-height:90vh;overflow:auto}
+.panel::before{content:"";display:block;width:36px;height:4px;border-radius:2px;background:var(--stroke2);margin:0 auto 6px}
+.panel label{display:block;color:var(--tx3);font-size:13px;margin:12px 0 5px}
+.two{display:flex;gap:10px}.two>div{flex:1}
+.sel{display:flex;gap:8px}
+.chip{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;background:var(--fill);border:1px solid var(--fillb);color:var(--tx2);border-radius:6px;padding:9px 4px;font-size:13px}
+.chip.on.ok{background:var(--okbg);border-color:rgba(108,203,95,.6);color:var(--tx)}
+.chip.on.no{background:var(--badbg);border-color:rgba(255,153,164,.6);color:var(--tx)}
+.chip.on.dl{background:var(--dlbg);border-color:rgba(96,205,255,.6);color:var(--tx)}
+.btns{display:flex;gap:8px;margin-top:14px}
+.btn{flex:1;border-radius:6px;padding:11px;font-size:15px;background:var(--fill);border:1px solid var(--fillb);color:var(--tx)}
+.btn.main{background:var(--accf);border-color:var(--accf);color:#000;font-weight:600}
+.btn.main:active{background:#42a1d2;color:#1a1a1a}
+.btn.bad{color:var(--bad)}.btn.bad:active{background:rgba(255,153,164,.12)}
+#toast{position:fixed;left:50%;bottom:92px;transform:translateX(-50%) translateY(8px);display:flex;align-items:center;gap:9px;background:var(--card);border:1px solid var(--stroke2);color:var(--tx);padding:9px 16px;border-radius:8px;font-weight:600;opacity:0;transition:.22s;pointer-events:none;z-index:20;box-shadow:0 6px 18px #0007}
+#toast::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--ok)}
+#toast.show{opacity:1;transform:translateX(-50%)}
+</style>
+</head>
+<body>
+<header>
+  <div class="top"><h1><img src="icons/icon-192.png" alt="">Anime List Master</h1><button id="inst">Installieren</button><button class="ic" id="loadBtn" aria-label="Textdatei laden"><svg width="19" height="19" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5a1 1 0 011-1h3l1.5 1.5H13a1 1 0 011 1V12a1 1 0 01-1 1H3a1 1 0 01-1-1z"/></svg></button></div>
+  <input id="q" type="search" placeholder="Suchen …" autocomplete="off">
+</header>
+<main id="list"></main>
+<div class="fabs"><button class="fab sm" id="saveBtn" aria-label="Als Textdatei speichern"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h8l2 2v8H3zM5.5 3v3.5h4V3M5.5 13V9.5h5V13"/></svg></button><button class="fab" id="add" aria-label="Neuer Anime"><svg width="26" height="26" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v10M3 8h10"/></svg></button></div>
+
+<div class="sheet" id="shA"><div class="panel">
+  <label>Name</label><input id="an" autocomplete="off">
+  <label>Link (optional)</label><input id="al" type="url" inputmode="url" autocomplete="off">
+  <div class="btns"><button class="btn" data-close>Abbrechen</button><button class="btn main" id="aok">Speichern</button></div>
+  <div class="btns" id="aext"><button class="btn bad" id="adel">Anime löschen</button></div>
+</div></div>
+
+<div class="sheet" id="shS"><div class="panel">
+  <div id="sNum" class="two">
+    <div><label>Staffel</label><input id="sn" type="number" inputmode="numeric" min="1"></div>
+    <div><label>Folgen</label><input id="sf" type="number" inputmode="numeric" min="0"></div>
+  </div>
+  <div id="sRaw"><label>Text</label><input id="sr" autocomplete="off"></div>
+  <label>Status</label>
+  <div class="sel" id="ss"></div>
+  <div class="btns"><button class="btn" data-close>Abbrechen</button><button class="btn main" id="sok">Speichern</button></div>
+  <div class="btns" id="sext"><button class="btn bad" id="sdel">Staffel löschen</button></div>
+</div></div>
+<input type="file" id="file" accept=".txt,text/plain" hidden>
+<div id="toast"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const CYCLE=["✔","❌","🡇"], CLS={"✔":"ok","❌":"no","🡇":"dl"}, NAME={"✔":"Fertig","❌":"Offen","🡇":"Download"};
+const COLR={"✔":"#6ccb5f","❌":"#ff99a4","🡇":"#60cdff"};
+const P={"✔":"M3.5 8.5l3 3 6-6.5","❌":"M4.5 4.5l7 7M11.5 4.5l-7 7","🡇":"M8 3.5v8M4.8 8.4L8 11.6l3.2-3.2"};
+const PL="M8 3v10M3 8h10",LINK="M6.6 9.4l2.8-2.8M7.3 4.9l.9-.9a2.7 2.7 0 013.8 3.8l-.9.9M8.7 11.1l-.9.9a2.7 2.7 0 01-3.8-3.8l.9-.9";
+const svg=(d,n,c)=>`<svg width="${n}" height="${n}" viewBox="0 0 16 16" fill="none" stroke="${c||"currentColor"}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="${d}"/></svg>`;
+const ico=(s,n=30)=>P[s]?`<svg width="${n}" height="${n}" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="${COLR[s]}"/><g transform="translate(4 4)" fill="none" stroke="#1a1a1a" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="${P[s]}"/></g></svg>`:`<svg width="${n}" height="${n}" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="#9a9a9a" stroke-width="1.6"/></svg>`;
+const KEY="alm2_data";
+let data=[], q="", ai=-1, si=-1, st="❌";
+
+function load(){try{data=JSON.parse(localStorage.getItem(KEY))||[]}catch(e){data=[]}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){toast("Speichern im Browser fehlgeschlagen")}}
+function toast(t){const e=$("toast");e.textContent=t;e.classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove("show"),1800)}
+
+
+function el(tag,cls,txt){const e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e}
+function render(){
+  const box=$("list");box.textContent="";
+  const ql=q.toLowerCase();let n=0;
+  data.forEach((a,i)=>{
+    if(ql&&!a.n.toLowerCase().includes(ql))return;
+    n++;
+    const c=el("div","card");
+    const t=el("div","title");
+    const done=a.seasons.filter(x=>x.s==="✔").length;
+    const tt=el("div","t",a.n);tt.onclick=()=>openA(i);
+    t.append(tt);
+    const all=a.seasons.length&&done===a.seasons.length;
+    if(a.seasons.length)t.append(el("span","sum"+(all?" full":""),`${done}/${a.seasons.length}`));
+    if(a.l){const l=el("a","lnk");l.innerHTML=svg(LINK,18);l.href=/^https?:\/\//i.test(a.l)?a.l:"https://"+a.l;l.target="_blank";l.rel="noopener";t.append(l)}
+    c.append(t);
+    if(a.seasons.length){const bar=el("div","bar"+(all?" full":"")),fill=el("i");fill.style.width=Math.round(done/a.seasons.length*100)+"%";bar.append(fill);c.append(bar)}
+    a.seasons.forEach((x,j)=>{
+      const r=el("div","s "+(CLS[x.s]||""));
+      const b=el("button","x");b.innerHTML=ico(x.s);b.setAttribute("aria-label",NAME[x.s]||"Status");
+      b.onclick=ev=>{ev.stopPropagation();if(CYCLE.includes(x.s)){x.s=CYCLE[(CYCLE.indexOf(x.s)+1)%3];save();render()}else openS(i,j)};
+      const tx=el("div","tx");
+      if(x.raw)tx.append(el("span","m",x.raw));else tx.append(el("span","m","Staffel "+x.nr),el("span","sub",x.f+" Folgen"));
+      tx.onclick=()=>openS(i,j);
+      r.append(b,tx);c.append(r);
+    });
+    const add=el("button","addS");add.innerHTML=svg(PL,14)+"<span>Staffel hinzufügen</span>";add.onclick=()=>openS(i,-1);
+    c.append(add);box.append(c);
+  });
+  if(!n)box.append(el("div","empty",data.length?"Nichts gefunden.":"Noch leer. Tippe unten auf +, um einen Anime einzutragen."));
+}
+$("q").oninput=e=>{q=e.target.value;render()};
+
+/* Anime-Sheet */
+function openA(i){ai=i;$("an").value=i>=0?data[i].n:"";$("al").value=i>=0?data[i].l||"":"";
+  $("aext").style.display=i>=0?"flex":"none";$("shA").classList.add("show");setTimeout(()=>$("an").focus(),50)}
+$("add").onclick=()=>openA(-1);
+$("aok").onclick=()=>{
+  const n=$("an").value.replace(/\|/g,"/").trim(),l=$("al").value.replace(/\|/g,"").trim();
+  if(!n){$("an").focus();return}
+  const neu=ai<0;
+  if(!neu){data[ai].n=n;data[ai].l=l}else{data.push({n,l,seasons:[]})}
+  save();render();$("shA").classList.remove("show");toast("Gespeichert ✔");
+  if(neu){window.scrollTo(0,document.body.scrollHeight);openS(data.length-1,-1)}
+};
+$("adel").onclick=()=>{if(confirm("Diesen Anime samt allen Staffeln löschen?")){data.splice(ai,1);save();render();$("shA").classList.remove("show")}};
+
+/* Staffel-Sheet */
+function drawSt(){const b=$("ss");b.textContent="";
+  CYCLE.forEach(s=>{const c=el("button","chip "+CLS[s]+(st===s?" on":""));c.innerHTML=ico(s,26)+"<span>"+NAME[s]+"</span>";c.onclick=()=>{st=s;drawSt()};b.append(c)})}
+function openS(i,j){
+  ai=i;si=j;const a=data[i],x=j>=0?a.seasons[j]:null;
+  const last=a.seasons.filter(y=>!y.raw).slice(-1)[0];
+  st=x&&CYCLE.includes(x.s)?x.s:"❌";
+  $("sNum").style.display=x&&x.raw?"none":"flex";$("sRaw").style.display=x&&x.raw?"block":"none";
+  $("sn").value=x&&!x.raw?x.nr:(last?last.nr+1:1);
+  $("sf").value=x&&!x.raw?x.f:(last?last.f:12);
+  $("sr").value=x&&x.raw?x.raw:"";
+  $("sext").style.display=x?"flex":"none";
+  drawSt();$("shS").classList.add("show");setTimeout(()=>(x&&x.raw?$("sr"):$("sf")).focus(),50);
+}
+$("sok").onclick=()=>{
+  const a=data[ai],x=si>=0?a.seasons[si]:null;
+  let item;
+  if(x&&x.raw){const r=$("sr").value.replace(/\|/g,"/").trim();if(!r)return;item={s:st,raw:r}}
+  else item={s:st,nr:Math.max(1,+$("sn").value||1),f:Math.max(0,+$("sf").value||0)};
+  if(si>=0)a.seasons[si]=item;else a.seasons.push(item);
+  save();render();$("shS").classList.remove("show");toast("Gespeichert ✔");
+};
+$("sdel").onclick=()=>{if(confirm("Diese Staffel löschen?")){data[ai].seasons.splice(si,1);save();render();$("shS").classList.remove("show")}};
+document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>document.querySelectorAll(".sheet").forEach(s=>s.classList.remove("show")));
+document.querySelectorAll(".sheet").forEach(s=>s.addEventListener("click",e=>{if(e.target===s)s.classList.remove("show")}));
+
+/* Speichern/Laden als .txt (PC-Format: Symbol | Name | Link, ☆ = Titel, ⬛ = Ende) */
+function toText(){
+  return data.flatMap(a=>[`☆ | ${a.n} | ${a.l||""}`,
+    ...a.seasons.map(x=>`${x.s} | ${x.raw||`Staffel-${x.nr} ${x.f} folgen`} | `),"⬛ |  | "]).join("\n")+"\n";
+}
+function parse(t){
+  const out=[];let cur=null;
+  t.split(/\r?\n/).forEach(line=>{
+    if(!line.trim())return;
+    const p=line.split("|").map(x=>x.trim());if(p.length<2)return;
+    const s=p[0],n=p[1],l=p[2]||"";
+    if(s==="☆"){cur={n,l,seasons:[]};out.push(cur);return}
+    if(s==="⬛"){cur=null;return}
+    if(!cur){out.push({n,l,seasons:[]});return}
+    const m=n.match(/^Staffel-?\s*(\d+)\s+(\d+)\s+folgen$/i);
+    cur.seasons.push(m?{s,nr:+m[1],f:+m[2]}:{s,raw:n});
+  });
+  return out;
+}
+$("saveBtn").onclick=()=>{
+  if(!data.length){toast("Nichts zu speichern");return}
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([toText()],{type:"text/plain;charset=utf-8"}));
+  a.download="anime_liste.txt";document.body.append(a);a.click();a.remove();toast("Als Textdatei gespeichert ✔");
+};
+$("loadBtn").onclick=()=>$("file").click();
+$("file").onchange=async e=>{
+  const f=e.target.files[0];if(!f)return;
+  const list=parse(await f.text());
+  if(data.length&&!confirm(`${list.length} Anime laden und die aktuelle Liste ERSETZEN?`)){e.target.value="";return}
+  data=list;save();render();toast(`${list.length} Anime geladen`);e.target.value="";
+};
+
+load();render();
+
+/* PWA: Offline-Cache, Installieren-Button, Speicher dauerhaft anfordern */
+if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});
+let deferred=null;
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferred=e;$("inst").style.display="block"});
+$("inst").onclick=async()=>{if(!deferred)return;deferred.prompt();await deferred.userChoice;deferred=null;$("inst").style.display="none"};
+window.addEventListener("appinstalled",()=>{$("inst").style.display="none";toast("App installiert ✔")});
+</script>
+</body>
+</html>

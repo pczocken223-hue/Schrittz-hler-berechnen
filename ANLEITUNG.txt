@@ -1,0 +1,18 @@
+ANIME LIST MASTER – Handy-App (PWA) auf GitHub Pages
+=====================================================
+
+1) Auf github.com ein neues Repository anlegen (z.B. "list-master"), Public.
+2) "Add file" -> "Upload files": den INHALT dieses Ordners hineinziehen
+   (index.html, manifest.webmanifest, sw.js und den Ordner icons).
+   Die Dateien müssen direkt im Hauptverzeichnis liegen, nicht in einem Unterordner.
+3) Settings -> Pages -> Source: "Deploy from a branch" -> Branch "main", Ordner "/ (root)" -> Save.
+4) Nach 1-2 Minuten ist die App erreichbar unter:
+   https://DEIN-NAME.github.io/list-master/
+5) Link auf dem Handy in Chrome öffnen. Dann entweder oben auf
+   "Installieren" tippen oder Chrome-Menü (⋮) -> "App installieren" / "Zum Startbildschirm".
+   Danach liegt "List Master" mit Logo wie eine normale App auf dem Handy.
+
+TIPPS
+- Die Liste wird im Handy gespeichert. Mit dem 💾-Button regelmäßig als Textdatei sichern.
+- Nach Änderungen an den Dateien in sw.js die Zeile VERSION = "v1" auf "v2" usw. erhöhen,
+  damit Handys die neue Version laden.
