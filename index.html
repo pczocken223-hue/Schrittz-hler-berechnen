@@ -127,6 +127,9 @@ body.ro .x,body.ro .tx,body.ro .title .t{pointer-events:none}
   <div class="btns" id="cbk" style="display:none"><button class="btn bad" id="crest">Vorherige Liste wiederherstellen</button></div>
   <p class="hint srv">Du bist mit dem PC-Host (list_host.py) verbunden. Jedes Gerät, das diese Adresse öffnet, sieht dieselbe Liste; Änderungen erscheinen nach 1–2 Sekunden.</p>
   <p class="hint pc"><b>Mit PC-Host:</b> Läuft auf dem PC list_host.py, öffne auf dem Handy dessen Adresse (z. B. http://192.168.x.x:8765) statt dieser Seite.<br><br>Gib auf jedem Gerät denselben Code ein (oder öffne den kopierten Link) und tippe auf „Verbinden“. Die Liste wird live abgeglichen, solange mindestens zwei Geräte gleichzeitig offen sind – sonst beim nächsten Verbinden. Wer den Code kennt, kann deine Liste sehen und ändern.</p>
+  <label>PC-Adresse (z. B. https://192.168.178.26:8766)</label>
+  <input id="hh" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://192.168.x.x:8766">
+  <div class="btns"><button class="btn" id="hoff">Entfernen</button><button class="btn main" id="hgo">Mit PC verbinden</button></div>
   <div class="btns"><button class="btn" data-close>Schließen</button></div>
 </div></div>
 <input type="file" id="file" accept=".txt,text/plain" hidden>
@@ -441,14 +444,34 @@ function clientMsg(m){
 
 /* ===== PC-Host-Modus: Seite wird von list_host.py ausgeliefert ===== */
 const SRV={on:false,rev:-1,first:true,busy:false,again:false,pending:false,ver:0,fail:0,timer:null,pt:null};
+/* HB = feste PC-Adresse (für die App von GitHub); leer = Seite kommt direkt vom PC-Host */
+let HB="";try{HB=localStorage.getItem("alm2_host")||""}catch(e){}
+function normHost(v){
+  v=(v||"").trim();if(!v)return"";
+  if(!/^https?:\/\//i.test(v))v=(location.protocol==="https:"?"https://":"http://")+v;
+  return v.replace(/\/+$/,"")+"/";
+}
 async function srvApi(path,opt){
   const c=new AbortController(),t=setTimeout(()=>c.abort(),6000);
-  try{return await fetch(path,Object.assign({signal:c.signal,cache:"no-store"},opt||{}))}finally{clearTimeout(t)}
+  try{return await fetch(HB+path,Object.assign({signal:c.signal,cache:"no-store"},opt||{}))}finally{clearTimeout(t)}
 }
 async function srvDetect(){
-  if(!/^https?:$/.test(location.protocol))return false;
+  if(!HB&&!/^https?:$/.test(location.protocol))return false;
   try{const r=await srvApi("api/ping");if(!r.ok)return false;const j=await r.json();return!!(j&&j.app==="almhost")}catch(e){return false}
 }
+async function hostAuto(){if(HB&&!SRV.on&&await srvDetect()){if(SYNC.on)syncStop();srvStart()}}
+$("hh").value=HB.replace(/\/$/,"");
+$("hgo").onclick=async()=>{
+  const v=normHost($("hh").value);if(!v){toast("Adresse eintragen");return}
+  if(location.protocol==="https:"&&/^http:/i.test(v)&&!/\/\/(localhost|127\.)/.test(v)){
+    toast("Von GitHub geht nur https (Port +1, z. B. :8766) – siehe Fenster am PC");return}
+  HB=v;try{localStorage.setItem("alm2_host",HB)}catch(e){}
+  $("hh").value=HB.replace(/\/$/,"");
+  if(SRV.on){toast("Schon verbunden");return}
+  if(await srvDetect()){if(SYNC.on)syncStop();srvStart();toast("Mit PC verbunden ✔")}
+  else toast("PC nicht erreichbar – Host an? Gleiches WLAN? Zertifikat im Browser bestätigt?");
+};
+$("hoff").onclick=()=>{HB="";try{localStorage.removeItem("alm2_host")}catch(e){}$("hh").value="";toast("PC-Adresse entfernt")};
 function srvStart(){
   SRV.on=true;SRV.first=true;SRV.rev=-1;SRV.pending=isDirty()&&data.length>0;
   document.body.classList.add("srvmode");HM=1;render();
@@ -530,8 +553,9 @@ $("crest").onclick=()=>{
   if(!confirm("Liste vom "+new Date(b.t).toLocaleString("de-DE")+" wiederherstellen? Die aktuelle Liste wird ersetzt."))return;
   data=clean(b.data);persist();render();pushLocal();toast("Wiederhergestellt ✔");
 };
-window.addEventListener("online",()=>{if(SYNC.on&&!healthy())syncStart(SYNC.code)});
-document.addEventListener("visibilitychange",()=>{if(!document.hidden&&SYNC.on&&!healthy())syncStart(SYNC.code)});
+window.addEventListener("online",()=>{hostAuto();if(SYNC.on&&!healthy())syncStart(SYNC.code)});
+document.addEventListener("visibilitychange",()=>{if(!document.hidden){hostAuto();if(SYNC.on&&!healthy())syncStart(SYNC.code)}});
+setInterval(()=>{if(!document.hidden)hostAuto()},15000);
 (async function(){
   if(await srvDetect()){srvStart();return}
   const m=location.hash.match(/^#sync=([A-Za-z0-9]{6,16})$/);
